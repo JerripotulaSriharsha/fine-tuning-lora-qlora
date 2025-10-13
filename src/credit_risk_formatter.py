@@ -27,8 +27,8 @@ def format_credit_risk_input(age, occupation, annual_income, credit_utilization,
     util_formatted = f"{credit_utilization:.1f}%"
     dti_formatted = f"{dti_ratio:.1f}%"
     
-    # Create the formatted input as a single string
-    formatted_input = f"As a credit risk analyst, evaluate this loan application:\n\nCustomer Profile:\n- Age: {age} years\n- Occupation: {occupation}\n- Annual Income: {income_formatted}\n- Credit Utilization: {util_formatted}\n- Outstanding Debt: {debt_formatted}\n- Debt-to-Income Ratio: {dti_formatted}\n- Payment Behavior: {payment_behavior}\n- Credit Mix: {credit_mix}\n\nRegulatory Context:\n- Applicant falls under CFPB guidelines\n- Requires fair lending compliance\n- Consider economic conditions and industry stability\n\nProvide a comprehensive risk assessment with regulatory reasoning."
+    # Create the formatted input as a simple string
+    formatted_input = f"Age: {age}, Occupation: {occupation}, Annual Income: {annual_income}, Outstanding Debt: {outstanding_debt}, Credit Utilization Ratio: {credit_utilization}, Payment Behaviour: {payment_behavior}"
     
     return formatted_input
 

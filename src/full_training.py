@@ -6,8 +6,8 @@ import json
 import torch
 
 # Model configuration
-model_name = "unsloth/Qwen3-0.6B-unsloth-bnb-4bit"
-max_seq_length = 2048
+model_name = "unsloth/phi-2-bnb-4bit"  # 2.7B parameters - efficient and powerful
+max_seq_length = 1024  # Reduced sequence length
 dtype = None
 
 print("🦥 Loading model and tokenizer...")
@@ -17,6 +17,8 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     max_seq_length=max_seq_length,
     dtype=dtype,
     load_in_4bit=True,
+    device_map="auto",  # Automatically manage device placement
+    trust_remote_code=True,  # Required for some models
 )
 
 print("✅ Model loaded successfully!")
@@ -25,12 +27,12 @@ print("✅ Model loaded successfully!")
 print("🔧 Adding LoRA adapters...")
 model = FastLanguageModel.get_peft_model(
     model,
-    r=64,  # LoRA rank - higher = more capacity, more memory
+    r=32,  # Reduced LoRA rank for memory efficiency
     target_modules=[
         "q_proj", "k_proj", "v_proj", "o_proj",
         "gate_proj", "up_proj", "down_proj",
     ],
-    lora_alpha=128,  # LoRA scaling factor (usually 2x rank)
+    lora_alpha=64,  # LoRA scaling factor (usually 2x rank)
     lora_dropout=0,  # Supports any, but = 0 is optimized
     bias="none",     # Supports any, but = "none" is optimized
     use_gradient_checkpointing="unsloth",  # Unsloth's optimized version
@@ -68,10 +70,10 @@ trainer = SFTTrainer(
     train_dataset=dataset,
     dataset_text_field="text",
     max_seq_length=max_seq_length,
-    dataset_num_proc=2,
+    dataset_num_proc=1,  # Disable multiprocessing
     args=TrainingArguments(
-        per_device_train_batch_size=2,
-        gradient_accumulation_steps=4,  # Effective batch size = 8
+        per_device_train_batch_size=1,  # Reduced batch size
+        gradient_accumulation_steps=8,  # Effective batch size = 8
         warmup_steps=10,
         num_train_epochs=3,
         learning_rate=2e-4,
@@ -86,6 +88,7 @@ trainer = SFTTrainer(
         save_strategy="epoch",
         save_total_limit=2,
         dataloader_pin_memory=False,
+        dataloader_num_workers=0,  # Disable multiprocessing
     ),
 )
 
