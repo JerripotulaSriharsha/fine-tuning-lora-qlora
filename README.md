@@ -14,7 +14,6 @@ This project is currently under development.
 
 ## Usage
 
-Coming soon...
 
 ## License
 
