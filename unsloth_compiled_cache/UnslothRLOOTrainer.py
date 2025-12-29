@@ -1,16 +1,33 @@
 """
-2025.9.5
-2025.9.4
-4.56.1
-0.23.0
+2025.9.12
+2025.9.9
+4.56.2
+0.22.2
 __UNSLOTH_VERSIONING__
 """
+
+# Unsloth auto generated code
+# Copyright 2023-present Daniel Han-Chen, Michael Han-Chen & the Unsloth team. All rights reserved.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 from torch import Tensor
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from typing import Any, List, Optional, Tuple, Union, Dict, Set, Callable
-from trl.trainer.rloo_trainer import (Any, AutoConfig, AutoModelForSequenceClassification, AutoProcessor, AutoTokenizer, DataLoader, Dataset, FSDP, GenerationConfig, IterableDataset, Optional, Path, PeftConfig, PreTrainedModel, PreTrainedTokenizerBase, ProcessorMixin, RLOOConfig, RLOOTrainer, RepeatSampler, RewardFunc, Sampler, SyncRefModelCallback, Trainer, TrainerCallback, Union, VLLMClient, apply_chat_template, broadcast_object_list, copy, datasets, defaultdict, deque, disable_dropout_in_model, entropy_from_logits, gather, gather_object, generate_model_card, get_comet_experiment_url, identity, inspect, is_conversational, is_datasets_available, is_flash_attn_2_available, is_peft_model, is_rich_available, is_vllm_available, is_wandb_available, logger, logging, maybe_apply_chat_template, nanmax, nanmin, nanstd, nn, nullcontext, os, pad, partial, prepare_deepspeed, prepare_fsdp, prepare_peft_model, print_prompt_completions_sample, profiling_context, profiling_decorator, re, seed_worker, selective_log_softmax, set_seed, shuffle_sequence_dict, split_pixel_values_by_grid, split_tensor_dict, textwrap, torch, transformers, truncate_with_protected_tokens, unsplit_pixel_values_by_grid, unwrap_model_for_generation, warnings, Any, FSDP, Union, apply_chat_template, broadcast_object_list, copy, gather, gather_object, is_conversational, is_flash_attn_2_available, logging, maybe_apply_chat_template, nanstd, nullcontext, os, pad, profiling_context, re, torch, transformers, truncate_with_protected_tokens, unwrap_model_for_generation, FSDP, gather, is_peft_model, nn, nullcontext, os, profiling_decorator, re, Optional, PreTrainedModel, Trainer, logger, os, re, torch, FSDP, nn, os, re, FSDP, nn, re, torch)
+from trl.trainer.rloo_trainer import (Any, AutoConfig, AutoModelForSequenceClassification, AutoProcessor, AutoTokenizer, DataLoader, Dataset, FSDP, GenerationConfig, IterableDataset, Optional, Path, PeftConfig, PreTrainedModel, PreTrainedTokenizerBase, ProcessorMixin, RLOOConfig, RLOOTrainer, RepeatSampler, RewardFunc, Sampler, SyncRefModelCallback, Trainer, TrainerCallback, Union, VLLMClient, apply_chat_template, broadcast_object_list, copy, datasets, defaultdict, deque, disable_dropout_in_model, entropy_from_logits, gather, gather_object, generate_model_card, get_comet_experiment_url, identity, inspect, is_conversational, is_datasets_available, is_flash_attn_2_available, is_peft_model, is_rich_available, is_vllm_available, is_wandb_available, logger, logging, maybe_apply_chat_template, nanmax, nanmin, nanstd, nn, nullcontext, os, pad, partial, prepare_deepspeed, prepare_fsdp, prepare_peft_model, print_prompt_completions_sample, profiling_context, profiling_decorator, re, seed_worker, selective_log_softmax, set_seed, shuffle_sequence_dict, split_pixel_values_by_grid, split_tensor_dict, textwrap, torch, transformers, truncate_with_protected_tokens, unsplit_pixel_values_by_grid, unwrap_model_for_generation, warnings, Any, FSDP, Union, apply_chat_template, broadcast_object_list, copy, gather, gather_object, is_conversational, is_flash_attn_2_available, logging, maybe_apply_chat_template, nanstd, nullcontext, os, pad, profiling_context, re, torch, transformers, truncate_with_protected_tokens, unwrap_model_for_generation, FSDP, gather, is_peft_model, nn, nullcontext, os, profiling_decorator, re, Any, Union, profiling_decorator, re, shuffle_sequence_dict, split_pixel_values_by_grid, split_tensor_dict, torch, unsplit_pixel_values_by_grid, Optional, PreTrainedModel, Trainer, logger, os, re, torch, FSDP, nn, os, re, FSDP, nn, re, torch)
 
 
 import os
@@ -22,6 +39,24 @@ import numpy as np
 from contextlib import nullcontext
 from torch.nn import functional as F
 from transformers import DataCollatorForSeq2Seq, DataCollatorForLanguageModeling as TransformersDataCollatorForLanguageModeling
+from transformers.training_args import ParallelMode
+
+# Wrap trainer with padding to right and enable training mode
+import functools
+from types import MethodType
+def prepare_for_training_mode(f):
+    @functools.wraps(f)
+    def wrapper(self, *args, **kwargs):
+        # Enable training mode
+        if hasattr(self, 'model') and hasattr(self.model, "for_training"):
+            self.model.for_training()
+        output = f(self, *args, **kwargs)
+        # Return inference mode
+        if hasattr(self, 'model') and hasattr(self.model, "for_inference"):
+            self.model.for_inference()
+        return output
+    return wrapper
+pass
 
 torch_compile_options = {
     "epilogue_fusion"   : True,
@@ -48,6 +83,62 @@ def chunked_selective_log_softmax(logits, index):
     all_per_token_logps = torch.concat(all_per_token_logps)
     all_per_token_logps = all_per_token_logps.reshape((logits.shape[0], logits.shape[1]))
     return all_per_token_logps
+
+def calculate_pad_tokens_in_prompt(
+    input_ids: torch.Tensor,
+    logits_to_keep: int,
+    pad_token_id: int
+) -> torch.Tensor:
+    """
+    Given prompt tensor, it returns all the left padded tokens in that sequence. so [pad, pad, pad, cat] = 3 tokens 
+    """
+    if logits_to_keep >= input_ids.shape[1]:
+        raise ValueError("logits_to_keep must be smaller than the sequence length.")
+
+    prompt_section = input_ids[:, :-logits_to_keep]
+
+    padding_mask = (prompt_section == pad_token_id)
+
+    pad_token_counts = padding_mask.sum(dim=1)
+
+    return pad_token_counts
+
+def create_completion_attention_mask(
+    completion_input_ids: torch.Tensor,
+    left_pad_tokens_per_prompt: torch.Tensor,
+    max_left_pad: int,
+    pad_token_id: int
+) -> torch.Tensor:
+    """
+    Given that we have a sequence, [p,p,p,c,c,c,pad,pad,pad]
+
+    Where p are extra prompt tokens we got from slicing the torch tensor, c is completion tokens
+    and pad are pad tokens, this function would make a completion mask that would 0 out the pad
+    and p tokens. so in this example [0,0,0,1,1,1,0,0,0]
+    """
+    batch_size, completion_len = completion_input_ids.shape
+    device = completion_input_ids.device
+
+    num_tokens_to_mask = max_left_pad - left_pad_tokens_per_prompt
+
+    indices = torch.arange(completion_len, device=device).unsqueeze(0)
+    shift_mask = indices >= num_tokens_to_mask.unsqueeze(1)
+
+    non_padding_mask = (completion_input_ids != pad_token_id)
+
+    final_mask = shift_mask & non_padding_mask
+
+    return final_mask
+
+def left_pack_padding(tensor: torch.Tensor, pad_id: int) -> torch.Tensor:
+    """
+    Moves all padding tokens in each sequence of a batch to the right.
+    """
+    mask = (tensor != pad_id)
+    # Must do stable=True since binary mark is unordered
+    sorted_indices = torch.argsort(mask, dim=1, descending=True, stable=True)
+    packed_tensor = torch.gather(tensor, 1, sorted_indices)
+    return packed_tensor
 def vLLMSamplingParams(**kwargs):
     from vllm import SamplingParams
     sampling_params = SamplingParams(**kwargs)
@@ -146,10 +237,6 @@ class UnslothRLOOConfig(RLOOConfig):
               server is running (start with `trl vllm-serve`).
             - `"colocate"`: vLLM will run in the same process and share the training GPUs. This avoids the need for a
               separate server but may cause resource contention with training.
-        vllm_model_impl (`str`, *optional*, defaults to `"vllm"`):
-            Model implementation to use for vLLM. Must be one of `"transformers"` or `"vllm"`. `"transformers"`: Use
-            the `transformers` backend for model implementation. `"vllm"`: Use the `vllm` library for model
-            implementation.
         vllm_guided_decoding_regex (`str` or `None`, *optional*, defaults to `None`):
             Regex for vLLM guided decoding. If `None` (default), guided decoding is disabled.
 
@@ -176,6 +263,10 @@ class UnslothRLOOConfig(RLOOConfig):
             Control the tensor parallel size for vLLM. This setting only applies when `vllm_mode` is set to
             `"colocate"`. If you are using `vllm_mode="server"`, this parameter must be passed separately when
             launching the vLLM server via the `--vllm_tensor_parallel_size` flag.
+        vllm_model_impl (`str`, *optional*, defaults to `"vllm"`):
+            Model implementation to use for vLLM. Must be one of `"transformers"` or `"vllm"`. `"transformers"`: Use
+            the `transformers` backend for model implementation. `"vllm"`: Use the `vllm` library for model
+            implementation.
 
         > Parameters that control the training
 
@@ -385,10 +476,10 @@ class UnslothRLOOConfig(RLOOConfig):
         use_transformers_paged = False,
         cache_implementation = None,
         use_vllm = False,
+        vllm_server_base_url = None,
         vllm_mode = 'colocate',
         vllm_model_impl = 'vllm',
         vllm_guided_decoding_regex = None,
-        vllm_server_base_url = None,
         vllm_server_host = '0.0.0.0',
         vllm_server_port = 8000,
         vllm_server_timeout = 240.0,
@@ -595,10 +686,10 @@ class UnslothRLOOConfig(RLOOConfig):
             use_transformers_paged = use_transformers_paged,
             cache_implementation = cache_implementation,
             use_vllm = use_vllm,
+            vllm_server_base_url = vllm_server_base_url,
             vllm_mode = vllm_mode,
             vllm_model_impl = vllm_model_impl,
             vllm_guided_decoding_regex = vllm_guided_decoding_regex,
-            vllm_server_base_url = vllm_server_base_url,
             vllm_server_host = vllm_server_host,
             vllm_server_port = vllm_server_port,
             vllm_server_timeout = vllm_server_timeout,
@@ -744,16 +835,16 @@ class _UnslothRLOOTrainer(Trainer):
         model_init_kwargs = args.model_init_kwargs or {}
         if isinstance(model, str):
             model_id = model
-            dtype = model_init_kwargs.get("dtype")
-            if isinstance(dtype, torch.dtype) or dtype == "auto" or dtype is None:
-                pass  # dtype is already a torch.dtype or "auto" or None
-            elif isinstance(dtype, str):  # it's a str, but not "auto"
-                dtype = getattr(torch, dtype)
-                model_init_kwargs["dtype"] = dtype
+            torch_dtype = model_init_kwargs.get("torch_dtype")
+            if isinstance(torch_dtype, torch.dtype) or torch_dtype == "auto" or torch_dtype is None:
+                pass  # torch_dtype is already a torch.dtype or "auto" or None
+            elif isinstance(torch_dtype, str):  # it's a str, but not "auto"
+                torch_dtype = getattr(torch, torch_dtype)
+                model_init_kwargs["torch_dtype"] = torch_dtype
             else:
                 raise ValueError(
-                    "Invalid `dtype` passed to `RLOOConfig`. Expected either 'auto' or a string representing "
-                    f"a `torch.dtype` (e.g., 'float32'), but got {dtype}."
+                    "Invalid `torch_dtype` passed to `RLOOConfig`. Expected either 'auto' or a string representing "
+                    f"a `torch.dtype` (e.g., 'float32'), but got {torch_dtype}."
                 )
             # Disable caching if gradient checkpointing is enabled [not supported]
             config = AutoConfig.from_pretrained(model_id)
@@ -1344,7 +1435,10 @@ class _UnslothRLOOTrainer(Trainer):
                 # self._buffered_inputs=None can occur when resuming from a checkpoint
                 generation_batch = self._generate_and_score_completions(generation_batch)
                 generation_batch = split_pixel_values_by_grid(generation_batch)
-                generation_batch = shuffle_sequence_dict(generation_batch)
+
+                try: generation_batch = shuffle_sequence_dict(generation_batch)
+
+                except: pass
                 generation_batches = split_tensor_dict(generation_batch, self.args.steps_per_generation)
                 self._buffered_inputs = [unsplit_pixel_values_by_grid(batch) for batch in generation_batches]
             inputs = self._buffered_inputs[self._step % self.args.steps_per_generation]
@@ -2011,7 +2105,8 @@ class UnslothRLOOTrainer(_UnslothRLOOTrainer):
             - [Standard](dataset_formats#standard): Each sample contains plain text.
             - [Conversational](dataset_formats#conversational): Each sample contains structured messages (e.g., role
               and content).
-        eval_dataset ([`~datasets.Dataset`], [`~datasets.IterableDataset`] or `dict[str, Union[Dataset, IterableDataset]]`):
+        eval_dataset ([`~datasets.Dataset`], [`~datasets.IterableDataset`] or `dict[str, Union[Dataset,
+        IterableDataset]]`):
             Dataset to use for evaluation. It must meet the same requirements as `train_dataset`.
         processing_class ([`~transformers.PreTrainedTokenizerBase`], [`~transformers.ProcessorMixin`] or `None`, *optional*, defaults to `None`):
             Processing class used to process the data. The padding side must be set to "left". If `None`, the
@@ -2034,7 +2129,8 @@ class UnslothRLOOTrainer(_UnslothRLOOTrainer):
 
             If you want to remove one of the default callbacks used, use the [`~transformers.Trainer.remove_callback`]
             method.
-        optimizers (`tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR]`, *optional*, defaults to `(None, None)`):
+        optimizers (`tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR]`, *optional*, defaults to `(None,
+        None)`):
             A tuple containing the optimizer and the scheduler to use. Will default to an instance of [`AdamW`] on your
             model and a scheduler given by [`get_linear_schedule_with_warmup`] controlled by `args`.
         peft_config ([`~peft.PeftConfig`], *optional*, defaults to `None`):
@@ -2065,7 +2161,8 @@ class UnslothRLOOTrainer(_UnslothRLOOTrainer):
         use_fp16 = getattr(args, 'fp16', False)
         if type(use_fp16) is not bool: use_fp16 = False
         force_float32 = False
-        if os.environ.get('UNSLOTH_FORCE_FLOAT32', '0') == '1':
+        full_finetuning = os.environ.get('UNSLOTH_ENABLE_FULL_FINETUNING', '0') == '1'
+        if not full_finetuning and (os.environ.get('UNSLOTH_FORCE_FLOAT32', '0') == '1'):
             print('Unsloth: Switching to float32 training since model cannot work with float16')
             force_float32 = True
         mixed_precision_dtype = os.environ.get('UNSLOTH_MIXED_PRECISION', 'float32')
@@ -2077,10 +2174,12 @@ class UnslothRLOOTrainer(_UnslothRLOOTrainer):
         if not force_float32 and (float16 and use_bf16): raise TypeError('Unsloth: Model is in float16 precision but you want to use bfloat16 precision. Set fp16 to `True` and bf16 to `False`')
         if not force_float32 and (not float16 and use_fp16): raise TypeError('Unsloth: Model is in bfloat16 precision but you want to use float16 precision. Set fp16 to `False` and bf16 to `True`')
         if force_float32:
+            # Forced float32 training
             args.fp16 = False
             args.bf16 = False
             os.environ['ACCELERATE_MIXED_PRECISION'] = 'no'
         elif (not use_bf16 and not use_fp16) and mixed_precision_dtype == 'float32':
+            # Mixed precision training
             args.fp16 = float16
             args.bf16 = not float16
             os.environ['ACCELERATE_MIXED_PRECISION'] = 'fp16' if float16 else 'bf16'
@@ -2169,6 +2268,13 @@ class UnslothRLOOTrainer(_UnslothRLOOTrainer):
         from unsloth_zoo.logging_utils import PatchRLStatistics
         PatchRLStatistics('rloo_trainer', other_metrics)
         
+        # [TODO] Fix up DataParallel multiplying batch sizes
+        # [TODO] DDP works, but DP seems to not work? [TODO]
+        if getattr(args, "parallel_mode", None) == ParallelMode.NOT_DISTRIBUTED and args.n_gpu > 1:
+            if getattr(args, "_n_gpu", 1) != 1:
+                args._n_gpu = 1
+        if "model" in locals() and hasattr(model, "for_training"):
+            model.for_training()
         super().__init__(
             model = model,
             reward_funcs = reward_funcs,
@@ -2184,6 +2290,8 @@ class UnslothRLOOTrainer(_UnslothRLOOTrainer):
             policy = policy,
             ref_policy = ref_policy,
             data_collator = data_collator,**kwargs)
+        if "model" in locals() and hasattr(model, "for_inference"):
+            model.for_inference()
         if hasattr(self, 'neftune_hook_handle'):
             self.neftune_hook_handle.remove()
             if hasattr(self, 'neftune_hook_handle'): del self.neftune_hook_handle
@@ -2197,6 +2305,9 @@ class UnslothRLOOTrainer(_UnslothRLOOTrainer):
                 current_model.accelerator_scaler = scaler
                 current_model = current_model.model
             current_model.accelerator_scaler = scaler
+        pass
+        if hasattr(self, 'train'):
+            self.train = MethodType(prepare_for_training_mode(self.__class__.train), self)
         pass
         
 pass

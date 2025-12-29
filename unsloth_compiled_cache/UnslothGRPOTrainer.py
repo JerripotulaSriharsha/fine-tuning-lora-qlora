@@ -1,16 +1,33 @@
 """
-2025.9.5
-2025.9.4
-4.56.1
-0.23.0
+2025.9.12
+2025.9.9
+4.56.2
+0.22.2
 __UNSLOTH_VERSIONING__
 """
+
+# Unsloth auto generated code
+# Copyright 2023-present Daniel Han-Chen, Michael Han-Chen & the Unsloth team. All rights reserved.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 from torch import Tensor
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from typing import Any, List, Optional, Tuple, Union, Dict, Set, Callable
-from trl.trainer.grpo_trainer import (Any, AutoConfig, AutoModelForSequenceClassification, AutoProcessor, AutoTokenizer, DataLoader, Dataset, FSDP, GRPOConfig, GRPOTrainer, GenerationConfig, IterableDataset, Optional, Path, PeftConfig, PreTrainedModel, PreTrainedTokenizerBase, ProcessorMixin, RepeatSampler, RewardFunc, Sampler, SyncRefModelCallback, Trainer, TrainerCallback, Union, VLLMClient, _ForwardRedirection, apply_chat_template, broadcast_object_list, copy, datasets, defaultdict, deque, disable_dropout_in_model, entropy_from_logits, gather, gather_object, generate_model_card, get_comet_experiment_url, identity, inspect, is_conversational, is_datasets_available, is_flash_attn_2_available, is_liger_kernel_available, is_peft_model, is_rich_available, is_vllm_available, is_wandb_available, logger, logging, maybe_apply_chat_template, nanmax, nanmin, nanstd, nn, nullcontext, os, pad, partial, prepare_deepspeed, prepare_fsdp, prepare_multimodal_messages, prepare_peft_model, print_prompt_completions_sample, profiling_context, profiling_decorator, re, seed_worker, selective_log_softmax, set_seed, shuffle_sequence_dict, split_pixel_values_by_grid, split_tensor_dict, textwrap, torch, transformers, unsplit_pixel_values_by_grid, unwrap_model_for_generation, Any, FSDP, Union, apply_chat_template, broadcast_object_list, copy, gather, gather_object, is_conversational, is_flash_attn_2_available, logging, maybe_apply_chat_template, nanmax, nanmin, nanstd, nullcontext, os, pad, prepare_multimodal_messages, profiling_context, re, torch, transformers, unwrap_model_for_generation, entropy_from_logits, os, re, selective_log_softmax, torch, transformers, re, Any, Union, os, profiling_decorator, re, shuffle_sequence_dict, split_pixel_values_by_grid, split_tensor_dict, torch, unsplit_pixel_values_by_grid, Optional, PreTrainedModel, Trainer, logger, os, re, torch, FSDP, nn, os, re, FSDP, nn, re, torch, GRPOTrainer, Trainer, gather, os, re, torch)
+from trl.trainer.grpo_trainer import (Any, AutoConfig, AutoModelForSequenceClassification, AutoProcessor, AutoTokenizer, DataLoader, Dataset, FSDP, GRPOConfig, GRPOTrainer, GenerationConfig, IterableDataset, Optional, Path, PeftConfig, PreTrainedModel, PreTrainedTokenizerBase, ProcessorMixin, RepeatSampler, RewardFunc, Sampler, SyncRefModelCallback, Trainer, TrainerCallback, Union, VLLMClient, _ForwardRedirection, apply_chat_template, broadcast_object_list, copy, datasets, defaultdict, deque, disable_dropout_in_model, entropy_from_logits, gather, gather_object, generate_model_card, get_comet_experiment_url, identity, inspect, is_conversational, is_datasets_available, is_flash_attn_2_available, is_liger_kernel_available, is_peft_model, is_rich_available, is_vllm_available, is_wandb_available, logger, logging, maybe_apply_chat_template, nanmax, nanmin, nanstd, nn, nullcontext, os, pad, partial, prepare_deepspeed, prepare_fsdp, prepare_multimodal_messages, prepare_peft_model, print_prompt_completions_sample, profiling_context, profiling_decorator, re, seed_worker, selective_log_softmax, set_seed, shuffle_sequence_dict, split_pixel_values_by_grid, split_tensor_dict, textwrap, torch, transformers, truncate_with_protected_tokens, unsplit_pixel_values_by_grid, unwrap_model_for_generation, Any, FSDP, Union, apply_chat_template, broadcast_object_list, copy, gather, gather_object, is_conversational, is_flash_attn_2_available, logging, maybe_apply_chat_template, nanstd, nullcontext, os, pad, prepare_multimodal_messages, profiling_context, re, torch, transformers, truncate_with_protected_tokens, unwrap_model_for_generation, entropy_from_logits, os, pad, re, selective_log_softmax, torch, transformers, re, Any, Union, os, profiling_decorator, re, shuffle_sequence_dict, split_pixel_values_by_grid, split_tensor_dict, torch, unsplit_pixel_values_by_grid, Optional, PreTrainedModel, Trainer, logger, os, re, torch, FSDP, nn, os, re, FSDP, nn, re, torch, GRPOTrainer, Trainer, gather, os, re, torch)
 
 
 import os
@@ -22,6 +39,24 @@ import numpy as np
 from contextlib import nullcontext
 from torch.nn import functional as F
 from transformers import DataCollatorForSeq2Seq, DataCollatorForLanguageModeling as TransformersDataCollatorForLanguageModeling
+from transformers.training_args import ParallelMode
+
+# Wrap trainer with padding to right and enable training mode
+import functools
+from types import MethodType
+def prepare_for_training_mode(f):
+    @functools.wraps(f)
+    def wrapper(self, *args, **kwargs):
+        # Enable training mode
+        if hasattr(self, 'model') and hasattr(self.model, "for_training"):
+            self.model.for_training()
+        output = f(self, *args, **kwargs)
+        # Return inference mode
+        if hasattr(self, 'model') and hasattr(self.model, "for_inference"):
+            self.model.for_inference()
+        return output
+    return wrapper
+pass
 
 torch_compile_options = {
     "epilogue_fusion"   : True,
@@ -49,6 +84,61 @@ def chunked_selective_log_softmax(logits, index):
     all_per_token_logps = all_per_token_logps.reshape((logits.shape[0], logits.shape[1]))
     return all_per_token_logps
 
+def calculate_pad_tokens_in_prompt(
+    input_ids: torch.Tensor,
+    logits_to_keep: int,
+    pad_token_id: int
+) -> torch.Tensor:
+    """
+    Given prompt tensor, it returns all the left padded tokens in that sequence. so [pad, pad, pad, cat] = 3 tokens 
+    """
+    if logits_to_keep >= input_ids.shape[1]:
+        raise ValueError("logits_to_keep must be smaller than the sequence length.")
+
+    prompt_section = input_ids[:, :-logits_to_keep]
+
+    padding_mask = (prompt_section == pad_token_id)
+
+    pad_token_counts = padding_mask.sum(dim=1)
+
+    return pad_token_counts
+
+def create_completion_attention_mask(
+    completion_input_ids: torch.Tensor,
+    left_pad_tokens_per_prompt: torch.Tensor,
+    max_left_pad: int,
+    pad_token_id: int
+) -> torch.Tensor:
+    """
+    Given that we have a sequence, [p,p,p,c,c,c,pad,pad,pad]
+
+    Where p are extra prompt tokens we got from slicing the torch tensor, c is completion tokens
+    and pad are pad tokens, this function would make a completion mask that would 0 out the pad
+    and p tokens. so in this example [0,0,0,1,1,1,0,0,0]
+    """
+    batch_size, completion_len = completion_input_ids.shape
+    device = completion_input_ids.device
+
+    num_tokens_to_mask = max_left_pad - left_pad_tokens_per_prompt
+
+    indices = torch.arange(completion_len, device=device).unsqueeze(0)
+    shift_mask = indices >= num_tokens_to_mask.unsqueeze(1)
+
+    non_padding_mask = (completion_input_ids != pad_token_id)
+
+    final_mask = shift_mask & non_padding_mask
+
+    return final_mask
+
+def left_pack_padding(tensor: torch.Tensor, pad_id: int) -> torch.Tensor:
+    """
+    Moves all padding tokens in each sequence of a batch to the right.
+    """
+    mask = (tensor != pad_id)
+    # Must do stable=True since binary mark is unordered
+    sorted_indices = torch.argsort(mask, dim=1, descending=True, stable=True)
+    packed_tensor = torch.gather(tensor, 1, sorted_indices)
+    return packed_tensor
 def grpo_compute_loss(
     ref_logits,
     new_logits,
@@ -70,6 +160,7 @@ def grpo_compute_loss(
     logit_scale_multiply = kwargs.get("logit_scale_multiply", 0.0)
     logit_scale_divide   = kwargs.get("logit_scale_divide", 0.0)
     logit_softcapping    = kwargs.get("logit_softcapping", 0.0)
+    importance_sampling_level = kwargs.get("importance_sampling_level", "token")
 
     input_ids = input_ids.unsqueeze(-1)
 
@@ -83,7 +174,6 @@ def grpo_compute_loss(
     if temperature != 1.0: new_logits = new_logits / temperature
     new_x = torch.gather(new_logits, dim = -1, index = input_ids).squeeze(-1)
     new = new_x - torch.logsumexp(new_logits, dim = -1)
-
     # x_i - logsumexp(x_i)
     with torch.no_grad():
         if beta != 0.0:
@@ -121,16 +211,34 @@ def grpo_compute_loss(
         kl_i = torch.exp(ref - new) - (ref - new) - 1.0
 
     else:
-        kl_i = 0.0 # set it to 0 to not effect the downstream computation
+        # set kl_i to a tensor of zeros with the correct shape
+        if importance_sampling_level == "sequence":
+            kl_i = new.new_zeros(new.size(0), 1)
+        else:
+            kl_i = torch.zeros_like(new)
     # Full correct reverse KL divergence?? Missing term maybe?
     # kl_i = torch.exp(new) * kl_i
 
     # Below is forward KL (normal KL)
     # kl_i = torch.exp(old) * (old - new)
     if old_logits is not None: 
-        coef_1 = torch.exp(new - old)
+        log_ratio = new - old
     else:
-        coef_1 = torch.exp(new - new.detach())
+        log_ratio = new - new.detach()
+
+    if importance_sampling_level == "token":
+        log_importance_weights = log_ratio
+    elif importance_sampling_level == "sequence":
+        log_importance_weights = (log_ratio * mask).sum(-1) / mask.sum(-1).clamp(min=1.0)
+        log_importance_weights = log_importance_weights.unsqueeze(-1)
+    else:
+        raise ValueError(
+            f"Unknown importance sampling level: {importance_sampling_level}. Possible values are 'token' "
+            "and 'sequence'."
+        )
+
+    coef_1 =  torch.exp(log_importance_weights)
+
     coef_2 = torch.clamp(coef_1, 1 - epsilon_low, 1 + epsilon_high)
 
     if delta is not None:
@@ -151,7 +259,7 @@ def grpo_compute_loss(
     mask = mask.to(torch.float32)
     n_mask_per_reward = mask.sum(1)
 
-    # https://github.com/huggingface/trl/blob/main/trl/trainer/grpo_trainer.py#L1363-L1370
+    # https://github.com/huggingface/trl/blob/e8b8499f1f8d76838155b515e414ee98f757d6d5/trl/trainer/grpo_trainer.py#L1624
     if loss_type == "grpo":
         loss = ((loss_i * mask).sum(-1) / mask.sum(-1).clamp(min=1.0)).mean()
     elif loss_type == "bnpo":
@@ -162,14 +270,18 @@ def grpo_compute_loss(
         raise ValueError(f"Unknown loss type: {loss_type}")
 
     # loss = (loss_i * mask).sum() / mask.sum()
-    
-    # Get metrics as well which are folded
-    with torch.inference_mode():
-        completion_length = n_mask_per_reward.mean()
-        mean_kl_per_reward = (kl_i * mask).sum(1) / n_mask_per_reward
-        mean_kl = mean_kl_per_reward.mean()
-    pass
 
+    # Get metrics as well which are folded
+    def masked_batch_mean(x):
+        with torch.inference_mode():
+            completion_length = n_mask_per_reward.mean()
+            if x.shape[1] == 1:  # when importance_sampling_level == "sequence"
+                return completion_length, x.mean()
+            else:
+                mean_kl_per_reward = (x * mask).sum(1) / n_mask_per_reward
+                mean_kl = mean_kl_per_reward.mean()
+                return completion_length, mean_kl
+    completion_length, mean_kl = masked_batch_mean(kl_i)
     return loss, completion_length, mean_kl
 
 class UnslothEfficientGRPO(torch.autograd.Function):
@@ -179,16 +291,16 @@ class UnslothEfficientGRPO(torch.autograd.Function):
         if extra_kwargs is None:
             extra_kwargs = {}
         def compute_loss(new_hidden_states, old_hidden_states, ref_hidden_states, input_ids, mask, advantages, scaling):
-            new_logits = torch.matmul(new_hidden_states, lm_head.t())
+            new_logits = torch.matmul(new_hidden_states.to(lm_head.dtype), lm_head.t())
             new_logits = new_logits[:, :-1, :] # exclude the last logit: it corresponds to the next token pred
             with torch.no_grad():
                 if beta != 0.0:
-                    ref_logits = torch.matmul(ref_hidden_states, lm_head.t())
+                    ref_logits = torch.matmul(ref_hidden_states.to(lm_head.dtype), lm_head.t())
                     ref_logits = ref_logits[:, :-1, :] # exclude the last logit: it corresponds to the next token pred 
                 else:
                     ref_logits = None
                 if old_hidden_states is not None:
-                    old_logits = torch.matmul(old_hidden_states, lm_head.t())
+                    old_logits = torch.matmul(old_hidden_states.to(lm_head.dtype), lm_head.t())
                     old_logits = old_logits[:, :-1, :] # exclude the last logit: it corresponds to the next token pred 
                 else: 
                     old_logits = None
@@ -256,7 +368,10 @@ class UnslothEfficientGRPO(torch.autograd.Function):
             old_hidden_states  = torch.chunk(_old_hidden_states, chunks = n_chunks, dim = 0)
         else: 
             old_hidden_states = [None] * n_chunks
-        ref_hidden_states  = torch.chunk(_ref_hidden_states, chunks = n_chunks, dim = 0)
+        if _ref_hidden_states is not None: 
+            ref_hidden_states  = torch.chunk(_ref_hidden_states, chunks = n_chunks, dim = 0)
+        else: 
+            ref_hidden_states = [None] * n_chunks
         input_ids          = torch.chunk(_input_ids,         chunks = n_chunks, dim = 0)
         mask               = torch.chunk(_mask,              chunks = n_chunks, dim = 0)
         advantages         = torch.chunk(_advantages,        chunks = n_chunks, dim = 0)
@@ -317,12 +432,17 @@ def grpo_accumulated_loss(
     completion_mask,
     advantages,
     old_hidden_states,
+    ref_hidden_states, 
     n_chunks = -1,
     **kwargs,
 ):
     # All Unsloth Zoo code licensed under LGPLv3
     bsz, qlen = input_ids.shape
 
+    pixel_values = kwargs.get('pixel_values',None)
+    image_grid_thw = kwargs.get('image_grid_thw',None)
+    pixel_attention_mask = kwargs.get('pixel_attention_mask',None)
+    image_sizes = kwargs.get('image_sizes',None)
     # Find closest multiple
     factors = [i for i in range(1, bsz + 1) if bsz % i == 0]
     if n_chunks == -1: n_chunks = bsz
@@ -330,45 +450,87 @@ def grpo_accumulated_loss(
 
     if not hasattr(trainer, '_autocast_dtype'):
         trainer._autocast_dtype = torch.float16 if os.environ.get('ACCELERATE_MIXED_PRECISION', 'fp16') == 'fp16' else torch.bfloat16
-        if os.environ.get('UNSLOTH_FORCE_FLOAT32', '0') == '1': trainer._autocast_dtype = torch.float16
+        if os.environ.get('UNSLOTH_FORCE_FLOAT32', '0') == '1': trainer._autocast_dtype = None
     pass
     os.environ["UNSLOTH_RETURN_HIDDEN_STATES"] = "1"
 
-    completion_input_ids = input_ids[:, -logits_to_keep:]
     lm_head = trainer.model.get_output_embeddings().weight
 
-    with torch.amp.autocast(device_type = trainer.model.device.type, dtype = trainer._autocast_dtype):
-        with torch.inference_mode(), trainer.accelerator.unwrap_model(trainer.model, keep_fp32_wrapper = False).disable_adapter():
-            ref_hidden_states = trainer.model(
+    if pixel_values is None: 
+        left_pad_tokens_per_prompt = calculate_pad_tokens_in_prompt(input_ids, logits_to_keep, trainer.processing_class.pad_token_id)
+
+        max_left_pad = max(left_pad_tokens_per_prompt).item()
+
+        input_ids = left_pack_padding(input_ids, trainer.processing_class.pad_token_id)
+
+        completion_input_ids = input_ids[:, -(logits_to_keep +max_left_pad):]
+
+        completion_mask = create_completion_attention_mask(completion_input_ids, left_pad_tokens_per_prompt, max_left_pad, trainer.processing_class.pad_token_id).to(attention_mask.dtype)
+        attention_mask =  input_ids != trainer.processing_class.pad_token_id
+        attention_mask = attention_mask.to(attention_mask.dtype)
+    else: 
+        completion_input_ids = input_ids[:, -logits_to_keep:]
+    
+    unwrapped_model = trainer.accelerator.unwrap_model(trainer.model, keep_fp32_wrapper = False)
+
+    # Do not move hidden_states from device 1 to device 0:
+    for module in unwrapped_model.modules():
+        if hasattr(module, "_hf_hook") and hasattr(module._hf_hook, "io_same_decice"):
+            module._hf_hook.io_same_decice = False
+    pass
+
+    # Get autocaster
+    if trainer._autocast_dtype is None:
+        autocaster = nullcontext()
+    else:
+        autocaster = torch.amp.autocast(device_type = trainer.model.device.type, dtype = trainer._autocast_dtype)
+    with autocaster:
+        if pixel_values is None:
+            new_hidden_states = unwrapped_model(
                 input_ids = input_ids,
                 attention_mask = attention_mask,
+                pixel_values = pixel_values,
+                image_grid_thw = image_grid_thw,
+                pixel_attention_mask = pixel_attention_mask,
+                image_sizes = image_sizes,
+                # logits_to_keep = logits_to_keep + 1,
+            ).logits
+
+            #keep extra logit as we generated a new token
+            new_hidden_states = new_hidden_states[:, -(logits_to_keep +max_left_pad+1): , :]
+            if ref_hidden_states is not None: 
+                ref_hidden_states = ref_hidden_states[:, -(logits_to_keep +max_left_pad+1): , :]
+            if old_hidden_states is not None: 
+                old_hidden_states = old_hidden_states[:, -(logits_to_keep +max_left_pad+1): , :]
+        else: 
+            new_hidden_states = unwrapped_model(
+                input_ids = input_ids,
+                attention_mask = attention_mask,
+                pixel_values = pixel_values,
+                image_grid_thw = image_grid_thw,
+                pixel_attention_mask = pixel_attention_mask,
+                image_sizes = image_sizes,
                 logits_to_keep = logits_to_keep + 1,
             ).logits
-        pass
-        new_hidden_states = trainer.model(
-            input_ids = input_ids,
-            attention_mask = attention_mask,
-            logits_to_keep = logits_to_keep + 1,
-        ).logits
 
-        loss, completion_length, mean_kl = UnslothEfficientGRPO.apply(
-            new_hidden_states,
-            old_hidden_states,
-            ref_hidden_states,
-            lm_head,
-            completion_input_ids,
-            completion_mask,
-            advantages,
-            trainer.beta,
-            trainer.accelerator.scaler,
-            n_chunks,
-            kwargs # pass kwargs as a dict
-        )
-    pass
+    loss, completion_length, mean_kl = UnslothEfficientGRPO.apply(
+        new_hidden_states,
+        old_hidden_states,
+        ref_hidden_states,
+        lm_head,
+        completion_input_ids,
+        completion_mask,
+        advantages,
+        trainer.beta,
+        trainer.accelerator.scaler,
+        n_chunks,
+        kwargs # pass kwargs as a dict
+    )
+
     # Must force not returning hidden states but logits otherwise gibberish
     os.environ["UNSLOTH_RETURN_HIDDEN_STATES"] = "0"
-    return loss, completion_length, mean_kl
 
+    return loss, completion_length, mean_kl
     # Old non efficient code path
     new_logits = torch.matmul(new_hidden_states, lm_head.t())
     new_logits = new_logits[:, :-1, :] # exclude the last logit: it corresponds to the next token pred
@@ -407,6 +569,7 @@ def grpo_compute_loss_slow(
     logit_scale_multiply = kwargs.get("logit_scale_multiply", 0.0)
     logit_scale_divide   = kwargs.get("logit_scale_divide", 0.0)
     logit_softcapping    = kwargs.get("logit_softcapping", 0.0)
+    importance_sampling_level = kwargs.get("importance_sampling_level", "token")
 
     input_ids = input_ids.unsqueeze(-1)
 
@@ -420,7 +583,6 @@ def grpo_compute_loss_slow(
     if temperature != 1.0: new_logits = new_logits / temperature
     new_x = torch.gather(new_logits, dim = -1, index = input_ids).squeeze(-1)
     new = new_x - torch.logsumexp(new_logits, dim = -1)
-
     # x_i - logsumexp(x_i)
     with torch.no_grad():
         if beta != 0.0:
@@ -458,16 +620,34 @@ def grpo_compute_loss_slow(
         kl_i = torch.exp(ref - new) - (ref - new) - 1.0
 
     else:
-        kl_i = 0.0 # set it to 0 to not effect the downstream computation
+        # set kl_i to a tensor of zeros with the correct shape
+        if importance_sampling_level == "sequence":
+            kl_i = new.new_zeros(new.size(0), 1)
+        else:
+            kl_i = torch.zeros_like(new)
     # Full correct reverse KL divergence?? Missing term maybe?
     # kl_i = torch.exp(new) * kl_i
 
     # Below is forward KL (normal KL)
     # kl_i = torch.exp(old) * (old - new)
     if old_logits is not None: 
-        coef_1 = torch.exp(new - old)
+        log_ratio = new - old
     else:
-        coef_1 = torch.exp(new - new.detach())
+        log_ratio = new - new.detach()
+
+    if importance_sampling_level == "token":
+        log_importance_weights = log_ratio
+    elif importance_sampling_level == "sequence":
+        log_importance_weights = (log_ratio * mask).sum(-1) / mask.sum(-1).clamp(min=1.0)
+        log_importance_weights = log_importance_weights.unsqueeze(-1)
+    else:
+        raise ValueError(
+            f"Unknown importance sampling level: {importance_sampling_level}. Possible values are 'token' "
+            "and 'sequence'."
+        )
+
+    coef_1 =  torch.exp(log_importance_weights)
+
     coef_2 = torch.clamp(coef_1, 1 - epsilon_low, 1 + epsilon_high)
 
     if delta is not None:
@@ -488,7 +668,7 @@ def grpo_compute_loss_slow(
     mask = mask.to(torch.float32)
     n_mask_per_reward = mask.sum(1)
 
-    # https://github.com/huggingface/trl/blob/main/trl/trainer/grpo_trainer.py#L1363-L1370
+    # https://github.com/huggingface/trl/blob/e8b8499f1f8d76838155b515e414ee98f757d6d5/trl/trainer/grpo_trainer.py#L1624
     if loss_type == "grpo":
         loss = ((loss_i * mask).sum(-1) / mask.sum(-1).clamp(min=1.0)).mean()
     elif loss_type == "bnpo":
@@ -499,14 +679,18 @@ def grpo_compute_loss_slow(
         raise ValueError(f"Unknown loss type: {loss_type}")
 
     # loss = (loss_i * mask).sum() / mask.sum()
-    
-    # Get metrics as well which are folded
-    with torch.inference_mode():
-        completion_length = n_mask_per_reward.mean()
-        mean_kl_per_reward = (kl_i * mask).sum(1) / n_mask_per_reward
-        mean_kl = mean_kl_per_reward.mean()
-    pass
 
+    # Get metrics as well which are folded
+    def masked_batch_mean(x):
+        with torch.inference_mode():
+            completion_length = n_mask_per_reward.mean()
+            if x.shape[1] == 1:  # when importance_sampling_level == "sequence"
+                return completion_length, x.mean()
+            else:
+                mean_kl_per_reward = (x * mask).sum(1) / n_mask_per_reward
+                mean_kl = mean_kl_per_reward.mean()
+                return completion_length, mean_kl
+    completion_length, mean_kl = masked_batch_mean(kl_i)
     return loss, completion_length, mean_kl
 
 def vLLMSamplingParams(**kwargs):
@@ -607,10 +791,6 @@ class UnslothGRPOConfig(GRPOConfig):
               server is running (start with `trl vllm-serve`).
             - `"colocate"`: vLLM will run in the same process and share the training GPUs. This avoids the need for a
               separate server but may cause resource contention with training.
-        vllm_model_impl (`str`, *optional*, defaults to `"vllm"`):
-            Model implementation to use for vLLM. Must be one of `"transformers"` or `"vllm"`. `"transformers"`: Use
-            the `transformers` backend for model implementation. `"vllm"`: Use the `vllm` library for model
-            implementation.
         vllm_guided_decoding_regex (`str` or `None`, *optional*, defaults to `None`):
             Regex for vLLM guided decoding. If `None` (default), guided decoding is disabled.
 
@@ -637,9 +817,10 @@ class UnslothGRPOConfig(GRPOConfig):
             Control the tensor parallel size for vLLM. This setting only applies when `vllm_mode` is set to
             `"colocate"`. If you are using `vllm_mode="server"`, this parameter must be passed separately when
             launching the vLLM server via the `--vllm_tensor_parallel_size` flag.
-        vllm_enable_sleep_mode (`bool`, *optional*, defaults to `False`):
-            Whether to enable sleep mode for vLLM. If `True`, vLLM will sleep during the optimization step and woken
-            for weight sync and generation.
+        vllm_model_impl (`str`, *optional*, defaults to `"vllm"`):
+            Model implementation to use for vLLM. Must be one of `"transformers"` or `"vllm"`. `"transformers"`: Use
+            the `transformers` backend for model implementation. `"vllm"`: Use the `vllm` library for model
+            implementation.
 
         > Parameters that control the training
 
@@ -717,15 +898,6 @@ class UnslothGRPOConfig(GRPOConfig):
             `mask_truncated_completions=True`, only tokens from non-truncated completions are considered.
         use_liger_loss (`bool`, *optional*, defaults to `False`):
             Whether to use the Liger GRPO loss.
-        vllm_importance_sampling_correction (`bool`, *optional*, defaults to `True`):
-            Whether to apply Truncated Importance Sampling (TIS) between vLLM completion logprobs and recomputed
-            logprobs. [Your Efficient RL Framework Secretly Brings You Off-Policy RL
-            Training](https://fengyao.notion.site/off-policy-rl) highlights that using a separate generation framework
-            (such as vLLM) can introduce off-policy effects due to subtle implementation differences between generation
-            and training backends. TIS is proposed as a remedy for this issue.
-        vllm_importance_sampling_cap (`float`, *optional*, defaults to `2.0`):
-            Truncation parameter C for Truncated Importance Sampling (TIS). This sets an upper bound on the importance
-            sampling ratio, improving training stability.
 
         > Parameters that control the logging
 
@@ -897,11 +1069,10 @@ class UnslothGRPOConfig(GRPOConfig):
         use_transformers_paged = False,
         cache_implementation = None,
         use_vllm = False,
+        vllm_server_base_url = None,
         vllm_mode = 'colocate',
         vllm_model_impl = 'vllm',
-        vllm_enable_sleep_mode = False,
         vllm_guided_decoding_regex = None,
-        vllm_server_base_url = None,
         vllm_server_host = '0.0.0.0',
         vllm_server_port = 8000,
         vllm_server_timeout = 240.0,
@@ -922,8 +1093,6 @@ class UnslothGRPOConfig(GRPOConfig):
         ref_model_sync_steps = 512,
         top_entropy_quantile = 1.0,
         use_liger_loss = False,
-        vllm_importance_sampling_correction = False,
-        vllm_importance_sampling_cap = 2.0,
         log_completions = False,
         num_completions_to_print = None,
         wandb_log_unique_prompts = False,
@@ -1117,11 +1286,10 @@ class UnslothGRPOConfig(GRPOConfig):
             use_transformers_paged = use_transformers_paged,
             cache_implementation = cache_implementation,
             use_vllm = use_vllm,
+            vllm_server_base_url = vllm_server_base_url,
             vllm_mode = vllm_mode,
             vllm_model_impl = vllm_model_impl,
-            vllm_enable_sleep_mode = vllm_enable_sleep_mode,
             vllm_guided_decoding_regex = vllm_guided_decoding_regex,
-            vllm_server_base_url = vllm_server_base_url,
             vllm_server_host = vllm_server_host,
             vllm_server_port = vllm_server_port,
             vllm_server_timeout = vllm_server_timeout,
@@ -1142,8 +1310,6 @@ class UnslothGRPOConfig(GRPOConfig):
             ref_model_sync_steps = ref_model_sync_steps,
             top_entropy_quantile = top_entropy_quantile,
             use_liger_loss = use_liger_loss,
-            vllm_importance_sampling_correction = vllm_importance_sampling_correction,
-            vllm_importance_sampling_cap = vllm_importance_sampling_cap,
             log_completions = log_completions,
             num_completions_to_print = num_completions_to_print,
             wandb_log_unique_prompts = wandb_log_unique_prompts,**kwargs)
@@ -1186,16 +1352,16 @@ class _UnslothGRPOTrainer(Trainer):
         model_init_kwargs = args.model_init_kwargs or {}
         if isinstance(model, str):
             model_id = model
-            dtype = model_init_kwargs.get("dtype")
-            if isinstance(dtype, torch.dtype) or dtype == "auto" or dtype is None:
-                pass  # dtype is already a torch.dtype or "auto" or None
-            elif isinstance(dtype, str):  # it's a str, but not "auto"
-                dtype = getattr(torch, dtype)
-                model_init_kwargs["dtype"] = dtype
+            torch_dtype = model_init_kwargs.get("torch_dtype")
+            if isinstance(torch_dtype, torch.dtype) or torch_dtype == "auto" or torch_dtype is None:
+                pass  # torch_dtype is already a torch.dtype or "auto" or None
+            elif isinstance(torch_dtype, str):  # it's a str, but not "auto"
+                torch_dtype = getattr(torch, torch_dtype)
+                model_init_kwargs["torch_dtype"] = torch_dtype
             else:
                 raise ValueError(
-                    "Invalid `dtype` passed to `GRPOConfig`. Expected either 'auto' or a string representing "
-                    f"a `torch.dtype` (e.g., 'float32'), but got {dtype}."
+                    "Invalid `torch_dtype` passed to `GRPOConfig`. Expected either 'auto' or a string representing "
+                    f"a `torch.dtype` (e.g., 'float32'), but got {torch_dtype}."
                 )
             # Disable caching if gradient checkpointing is enabled [not supported]
             config = AutoConfig.from_pretrained(model_id)
@@ -1307,8 +1473,6 @@ class _UnslothGRPOTrainer(Trainer):
         self.vllm_mode = args.vllm_mode
         self.vllm_gpu_memory_utilization = args.vllm_gpu_memory_utilization  # only applies to colocation mode
         self.vllm_tensor_parallel_size = args.vllm_tensor_parallel_size  # only applies to colocation mode
-        self.vllm_importance_sampling_correction = args.vllm_importance_sampling_correction
-        self.vllm_importance_sampling_cap = args.vllm_importance_sampling_cap
         self.use_liger_loss = args.use_liger_loss
         self.loss_type = args.loss_type
         self.scale_rewards = args.scale_rewards
@@ -1476,8 +1640,6 @@ class _UnslothGRPOTrainer(Trainer):
                 else:
                     max_model_len = None
                 self.llm = model.vllm_engine
-                if self.args.vllm_enable_sleep_mode:
-                    self.llm.sleep(level=1)
             else:
                 raise ValueError(f"vllm_mode must be either 'server' or 'colocate', got '{self.vllm_mode}'.")
             self.guided_decoding_regex = args.vllm_guided_decoding_regex
@@ -1672,7 +1834,9 @@ class _UnslothGRPOTrainer(Trainer):
         last_hidden_state = last_hidden_state[:, -logits_to_keep:, :]  # (B, logits_to_keep, H)
         return last_hidden_state
 
-    def get_high_entropy_mask(self, entropies: torch.Tensor, mask: torch.Tensor, threshold: float) -> torch.Tensor:
+    def get_high_entropy_mask(
+        self, entropies: torch.Tensor, mask: torch.Tensor, threshold: float, accelerator=None
+    ) -> torch.Tensor:
         """
         Returns a binary mask identifying tokens whose entropy exceeds a given quantile threshold.
 
@@ -1692,48 +1856,64 @@ class _UnslothGRPOTrainer(Trainer):
         non_pad_entropies = entropies[mask.bool()].float()
         if non_pad_entropies.numel() == 0:
             return torch.zeros_like(entropies, dtype=torch.bool)
-
-        # The shape of non_pad_entropies can be different on each gpu/device.
-        # this can cause the gather operation to hang. So we first gather the lengths
-        # of non_pad_entropies and pad them to the max length before doing a gather.
-        non_pad_entropies_seq_length = torch.tensor([non_pad_entropies.numel()], device=entropies.device)
-        max_non_pad_entropies_seq_length = self.accelerator.gather(non_pad_entropies_seq_length).max().item()
-        padding = torch.zeros(
-            max_non_pad_entropies_seq_length - non_pad_entropies.numel(), device=non_pad_entropies.device
-        )
-        padded_entropies = torch.cat([non_pad_entropies, padding])
-        padded_entropies_mask = torch.cat([torch.ones_like(non_pad_entropies), padding])
-        all_padded_entropies = self.accelerator.gather(padded_entropies)
-        all_padded_entropies_mask = self.accelerator.gather(padded_entropies_mask)
-        # Filter out entropies corresponding to padding.
-        all_non_padded_entropies = all_padded_entropies[all_padded_entropies_mask.bool()]
-        entropy_threshold = torch.quantile(all_non_padded_entropies, threshold)
+        all_non_pad_entropies = self.accelerator.gather(non_pad_entropies)
+        # Filter out any empty tensors that might result from processes with no valid tokens
+        entropy_threshold = torch.quantile(all_non_pad_entropies, threshold)
         masked_entropies = entropies * mask.float()
         entropy_mask = masked_entropies >= entropy_threshold
         return entropy_mask & mask.bool()  # ensure padding tokens are always masked out
 
-    def _get_per_token_logps_and_entropies(self, model, input_ids, attention_mask, logits_to_keep, batch_size = None, compute_entropy = False, *args, **kwargs):
-        if True: # os.environ.get('UNSLOTH_USE_NEW_MODEL', '0') == '0':
-            return None, None  # logps, entropies Unsloth efficient GRPO
-        # Otherwise, calculate normally:
-        if not hasattr(self, '_autocast_dtype'):
-            self._autocast_dtype = torch.float16 if os.environ.get('ACCELERATE_MIXED_PRECISION', 'fp16') == 'fp16' else torch.bfloat16
-            if os.environ.get('UNSLOTH_FORCE_FLOAT32', '0') == '1': self._autocast_dtype = torch.float16
+    def _get_per_token_logps_and_entropies(self, model, input_ids, attention_mask, logits_to_keep, batch_size = None, 
+                                           compute_entropy = False, compute_efficient = False, *args, **kwargs):
+        # if True: # os.environ.get('UNSLOTH_USE_NEW_MODEL', '0') == '0':
+        #     return None, None  # logps, entropies Unsloth efficient GRPO
+        if compute_efficient:
+            return None, None
+        else: 
+            # Otherwise, calculate normally:
+            if not hasattr(self, '_autocast_dtype'):
+                self._autocast_dtype = torch.float16 if os.environ.get('ACCELERATE_MIXED_PRECISION', 'fp16') == 'fp16' else torch.bfloat16
+                if os.environ.get('UNSLOTH_FORCE_FLOAT32', '0') == '1': self._autocast_dtype = torch.float16
 
-        os.environ["UNSLOTH_RETURN_HIDDEN_STATES"] = "1"
-        with torch.amp.autocast(device_type = 'cuda', dtype = self._autocast_dtype):
-            # We add 1 to `logits_to_keep` because the last logits of the sequence is later excluded
-            logits = model(
-                input_ids = input_ids,
-                attention_mask = attention_mask,
-                logits_to_keep = logits_to_keep + 1,
-            ).logits
+            pixel_values, image_grid_thw = kwargs.get("pixel_values", None), kwargs.get("image_grid_thw", None)
+            pixel_attention_mask, image_sizes = kwargs.get('pixel_attention_mask',None), kwargs.get('image_sizes',None)
 
-            entropies = None
-            if compute_entropy:
-                from trl.trainer.utils import entropy_from_logits
-                entropies = entropy_from_logits(logits)
+            os.environ["UNSLOTH_RETURN_HIDDEN_STATES"] = "1"
+           
+            unwrapped_model = self.accelerator.unwrap_model(model, keep_fp32_wrapper=False)
 
+            with torch.amp.autocast(device_type = 'cuda', dtype = self._autocast_dtype):
+                with torch.inference_mode():
+                    if pixel_values is None: 
+                        attention_mask =  input_ids != self.processing_class.pad_token_id
+                        attention_mask = attention_mask.to(attention_mask.dtype)
+                        # We add 1 to `logits_to_keep` because the last logits of the sequence is later excluded
+                        logits = unwrapped_model(
+                            input_ids = input_ids,
+                            attention_mask = attention_mask,
+                            pixel_values = pixel_values,
+                            image_grid_thw = image_grid_thw,
+                            pixel_attention_mask = pixel_attention_mask,
+                            image_sizes = image_sizes,
+                            #logits_to_keep = logits_to_keep + 1,
+                        ).logits
+                    else:
+                        logits = unwrapped_model(
+                            input_ids = input_ids,
+                            attention_mask = attention_mask,
+                            pixel_values = pixel_values,
+                            image_grid_thw = image_grid_thw,
+                            pixel_attention_mask = pixel_attention_mask,
+                            image_sizes = image_sizes,
+                            logits_to_keep = logits_to_keep + 1,
+                        ).logits
+                    
+
+                entropies = None
+                if compute_entropy:
+                    from trl.trainer.utils import entropy_from_logits
+                    entropies = entropy_from_logits(logits)
+            os.environ["UNSLOTH_RETURN_HIDDEN_STATES"] = "0"
             # logits = logits[:, :-1, :]  # (B, L-1, V), exclude the last logit: it corresponds to the next token pred
             return logits, entropies  # logps, entropies
             # input_ids = input_ids[:, -logits_to_keep:]
@@ -1834,7 +2014,10 @@ class _UnslothGRPOTrainer(Trainer):
                 # self._buffered_inputs=None can occur when resuming from a checkpoint
                 generation_batch = self._generate_and_score_completions(generation_batch)
                 generation_batch = split_pixel_values_by_grid(generation_batch)
-                generation_batch = shuffle_sequence_dict(generation_batch)
+
+                try: generation_batch = shuffle_sequence_dict(generation_batch)
+
+                except: pass
                 generation_batches = split_tensor_dict(generation_batch, self.args.steps_per_generation)
                 self._buffered_inputs = [unsplit_pixel_values_by_grid(batch) for batch in generation_batches]
             inputs = self._buffered_inputs[self._step % self.args.steps_per_generation]
@@ -1944,29 +2127,24 @@ class _UnslothGRPOTrainer(Trainer):
             # If max_prompt_length is set, we trim the prompt to keep only the last `max_prompt_length` tokens.
             # Then we decode those tokens back into text. We manually remove leading pad tokens from the decoded text,
             # because we can't use `skip_special_tokens=True` (some special tokens are still needed for generation).
-            prompt_ids = prompt_ids[:, -self.max_prompt_length :]
-            prompt_mask = prompt_mask[:, -self.max_prompt_length :]
-            prompts_text = self.processing_class.batch_decode(
-                prompt_ids, skip_special_tokens=False, clean_up_tokenization_spaces=False
+            protected = [self.image_token_id, self.vision_start_token_id, self.vision_end_token_id]
+            protected = [token for token in protected if token is not None]
+            prompt_ids, prompt_mask = truncate_with_protected_tokens(
+                prompt_ids, prompt_mask, self.max_prompt_length, protected
             )
-            pad_token = self.processing_class.pad_token
-            def strip_leading_tokens(text):
-                while text.startswith(pad_token):
-                    text = text.removeprefix(pad_token)
-                return text
 
-            if pad_token is not None:
+            prompts_text = [re.sub(rf"^({re.escape(self.pad_token)})+", "", text) for text in prompts_text]
+
+            # The chat template inserts a single image token into the prompt text. However, when this text is later
+            # tokenized, the single image token string is expanded into multiple image token IDs, depending on the
+            # image size. Since we're detokenizing here, we may see repeated image tokens in the decoded text. We
+            # collapse them back into a single token string to match the original template.
+            if self.image_token is not None:
                 prompts_text = [
-                    strip_leading_tokens(text) for text in prompts_text
+                    re.sub(rf"({re.escape(self.image_token)})+", self.image_token, text) for text in prompts_text
                 ]
-
         # Generate completions using either vLLM or regular generation
         if self.use_vllm:
-            if self.vllm_mode == "colocate" and self.args.vllm_enable_sleep_mode:
-                # wake up colocated vLLM instances if needed
-                torch.cuda.empty_cache()  # required to avoid OOM in some cases
-                self.llm.wake_up()
-
             # First, update the vLLM weights if needed
             if self.state.global_step != self._last_loaded_step:
                 self._move_model_to_vllm()
@@ -1990,7 +2168,7 @@ class _UnslothGRPOTrainer(Trainer):
                         ordered_set_of_images = None
 
                     with profiling_context(self, "vLLM.generate"):
-                        output = self.vllm_client.generate(
+                        completion_ids = self.vllm_client.generate(
                             prompts=ordered_set_of_prompts,
                             images=ordered_set_of_images,
                             n=self.num_generations,
@@ -2003,21 +2181,16 @@ class _UnslothGRPOTrainer(Trainer):
                             guided_decoding_regex=self.guided_decoding_regex,
                             generation_kwargs=self.args.generation_kwargs,
                         )
-                        payload = (output["completion_ids"], output["logprobs"])
                 else:
-                    payload = None
-
-                # Broadcast the completions from the main process to all processes, ensuring each process receives its corresponding slice.
-                obj_list = [payload]
-                broadcast_object_list(obj_list, from_process=0)
-                completion_ids, all_logprobs = obj_list[0]
-
+                    completion_ids = [None] * len(all_prompts_text)
+                # Broadcast the completions from the main process to all processes, ensuring each process receives its
+                # corresponding slice.
+                completion_ids = broadcast_object_list(completion_ids, from_process=0)
                 process_slice = slice(
                     self.accelerator.process_index * len(prompts),
                     (self.accelerator.process_index + 1) * len(prompts),
                 )
                 completion_ids = completion_ids[process_slice]
-                all_logprobs = all_logprobs[process_slice]
 
             # Generate completions using colocated vLLM instances: each device holds vLLM copy and work on their own batch of prompts
             elif self.vllm_mode == "colocate":
@@ -2035,7 +2208,6 @@ class _UnslothGRPOTrainer(Trainer):
                     "min_p": 0.0 if self.min_p is None else self.min_p,
                     "max_tokens": self.max_completion_length,
                     "guided_decoding": guided_decoding,
-                    "logprobs": 0,  # only return the logprob of the generated token
                 }
                 if self.args.generation_kwargs is not None:
                     generation_kwargs.update(self.args.generation_kwargs)
@@ -2073,11 +2245,6 @@ class _UnslothGRPOTrainer(Trainer):
                     all_outputs = self.llm.generate(vllm_inputs, sampling_params=sampling_params, use_tqdm=False, lora_request = self.model.load_lora('grpo_trainer_lora_model', load_tensors = True))
 
                 completion_ids = [output.token_ids for outputs in all_outputs for output in outputs.outputs]
-                all_logprobs = [
-                    [next(iter(lp.values())).logprob for lp in output.logprobs]
-                    for outputs in all_outputs
-                    for output in outputs.outputs
-                ]
 
                 if self.vllm_tensor_parallel_size > 1:
                     # Slice completions for this rank within its TP group.
@@ -2085,19 +2252,11 @@ class _UnslothGRPOTrainer(Trainer):
                     local_rank_in_group = torch.distributed.get_rank(group=self.tp_group)
                     tp_slice = slice(local_rank_in_group * orig_size, (local_rank_in_group + 1) * orig_size)
                     completion_ids = completion_ids[tp_slice]
-                    all_logprobs = all_logprobs[tp_slice]
-
-                if self.args.vllm_enable_sleep_mode:
-                    self.llm.sleep(level=1)
 
             # Pad the completions, and concatenate them with the prompts
             completion_ids = [torch.tensor(ids, device=device) for ids in completion_ids]
             completion_ids = pad(completion_ids, padding_value=self.pad_token_id)
             prompt_completion_ids = torch.cat([prompt_ids, completion_ids], dim=1)
-            sampling_per_token_logps = [
-                torch.tensor(logprobs, device=device, dtype=torch.float32) for logprobs in all_logprobs
-            ]
-            sampling_per_token_logps = pad(sampling_per_token_logps, padding_value=0.0)
 
         elif self.use_transformers_paged:
             # Re-process inputs for paged generation if needed
@@ -2178,7 +2337,11 @@ class _UnslothGRPOTrainer(Trainer):
         attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)  # (B, P+C)
 
         logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
+        
         batch_size = self.args.per_device_train_batch_size if mode == "train" else self.args.per_device_eval_batch_size
+        if not has_images:
+            # Left pad prompt before calculation old and ref hidden states
+            prompt_completion_ids = left_pack_padding(prompt_completion_ids, self.processing_class.pad_token_id)
 
         with torch.no_grad():
             # If the generation and optimization steps are misaligned—i.e., if generation does not occur at the end of
@@ -2186,12 +2349,8 @@ class _UnslothGRPOTrainer(Trainer):
             # samples may come from an earlier version of the model. In that case, we need to track old_per_token_logps
             # for importance sampling. If the steps are aligned, importance sampling isn't necessary and we set
             # old_per_token_logps to None.
-            # When using vLLM, we always compute old_per_token_logps for importance sampling, it was shown that the
-            # distribution mismatch between vLLM and the training model can be large and harm the training.
             generate_every = self.args.steps_per_generation * self.num_iterations  # generation frequency
-            if self.args.gradient_accumulation_steps % generate_every != 0 or (
-                self.use_vllm and self.vllm_importance_sampling_correction
-            ):
+            if self.args.gradient_accumulation_steps % generate_every != 0:
                 old_per_token_logps, _ = self._get_per_token_logps_and_entropies(
                     self.model,
                     prompt_completion_ids,
@@ -2205,13 +2364,6 @@ class _UnslothGRPOTrainer(Trainer):
                 )
             else:
                 old_per_token_logps = None
-
-            # Compute the importance sampling ratio when using vLLM, to correct for potential distribution mismatch
-            if self.use_vllm and self.vllm_importance_sampling_correction:
-                importance_sampling_ratio = torch.exp(old_per_token_logps - sampling_per_token_logps)
-                importance_sampling_ratio = torch.clamp(
-                    importance_sampling_ratio, max=self.vllm_importance_sampling_cap
-                )
 
             # Compute the per-token log probabilities for the reference model
             if self.beta != 0.0:
@@ -2333,38 +2485,6 @@ class _UnslothGRPOTrainer(Trainer):
         if has_images:
             self._logs["image"].extend(gather_object(images))
 
-        if self.use_vllm and self.vllm_importance_sampling_correction:
-            delta = torch.abs(old_per_token_logps - sampling_per_token_logps)
-            delta = delta[completion_mask.bool()]
-            mean_delta = torch.mean(delta) if delta.numel() > 0 else torch.tensor(0.0, device=device)
-            max_delta = torch.max(delta) if delta.numel() > 0 else torch.tensor(0.0, device=device)
-            self._metrics[mode]["sampling/sampling_logp_difference/mean"].append(
-                self.accelerator.gather(mean_delta).mean().item()
-            )
-            self._metrics[mode]["sampling/sampling_logp_difference/max"].append(
-                self.accelerator.gather(max_delta).max().item()
-            )
-
-            flat_is_ratio = importance_sampling_ratio[completion_mask.bool()]
-            min_importance_sampling_ratio = (
-                torch.min(flat_is_ratio) if flat_is_ratio.numel() > 0 else torch.tensor(0.0, device=device)
-            )
-            mean_importance_sampling_ratio = (
-                torch.mean(flat_is_ratio) if flat_is_ratio.numel() > 0 else torch.tensor(0.0, device=device)
-            )
-            max_importance_sampling_ratio = (
-                torch.max(flat_is_ratio) if flat_is_ratio.numel() > 0 else torch.tensor(0.0, device=device)
-            )
-            self._metrics[mode]["sampling/importance_sampling_ratio/min"].append(
-                nanmin(self.accelerator.gather(min_importance_sampling_ratio)).item()
-            )
-            self._metrics[mode]["sampling/importance_sampling_ratio/mean"].append(
-                self.accelerator.gather(mean_importance_sampling_ratio).nanmean().item()
-            )
-            self._metrics[mode]["sampling/importance_sampling_ratio/max"].append(
-                nanmax(self.accelerator.gather(max_importance_sampling_ratio)).item()
-            )
-
         output = {
             "prompt_ids": prompt_ids,
             "prompt_mask": prompt_mask,
@@ -2375,8 +2495,6 @@ class _UnslothGRPOTrainer(Trainer):
         }
         if old_per_token_logps is not None:
             output["old_per_token_logps"] = old_per_token_logps
-        if self.use_vllm and self.vllm_importance_sampling_correction:
-            output["importance_sampling_ratio"] = importance_sampling_ratio
         if ref_per_token_logps is not None:
             output["ref_per_token_logps"] = ref_per_token_logps
         if "pixel_values" in prompt_inputs:
@@ -2435,9 +2553,11 @@ class _UnslothGRPOTrainer(Trainer):
         if return_outputs:
             raise ValueError("The GRPOTrainer does not support returning outputs")
         # Compute the per-token log probabilities for the model
-
         prompt_ids, prompt_mask = inputs["prompt_ids"], inputs["prompt_mask"]
         completion_ids, completion_mask = inputs["completion_ids"], inputs["completion_mask"]
+        pixel_values, image_grid_thw = inputs.get("pixel_values", None), inputs.get("image_grid_thw", None)
+        pixel_attention_mask, image_sizes = inputs.get('pixel_attention_mask',None), inputs.get('image_sizes',None)
+
         input_ids = torch.cat([prompt_ids, completion_ids], dim=1)
         bsz, qlen = input_ids.shape
         attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
@@ -2447,21 +2567,21 @@ class _UnslothGRPOTrainer(Trainer):
         _logits_to_keep = logits_to_keep
 
         get_logps_func = \
-            lambda model, input_ids, attention_mask, logits_to_keep, batch_size=None, compute_entropy=False: \
-            self._get_per_token_logps(model, input_ids, attention_mask, logits_to_keep) \
+            lambda model, input_ids, attention_mask, logits_to_keep, batch_size=None, compute_entropy=False, compute_efficient = False: \
+            self._get_per_token_logps(model, input_ids, attention_mask, logits_to_keep, compute_efficient) \
             if hasattr(self, "_get_per_token_logps") else \
-            self._get_per_token_logps_and_entropies(model, input_ids, attention_mask, logits_to_keep, batch_size, compute_entropy)[0]  # logps
-
-        per_token_logps = get_logps_func(model, input_ids, attention_mask, logits_to_keep)
-
+            self._get_per_token_logps_and_entropies(model, input_ids, attention_mask, logits_to_keep, batch_size, compute_entropy, compute_efficient)[0]  # logps
+        #breakpoint()
+        per_token_logps = get_logps_func(model, input_ids, attention_mask, logits_to_keep, compute_efficient = True)
         # Compute the KL divergence between the model and the reference model
         # _prepare_inputs doesn't return reference log probs anymore. We need to calculate it ourselves.
         # https://github.com/huggingface/trl/blob/05bc43e960396581e458195b8388efe6b82cae1f/trl/trainer/grpo_trainer.py#L1328
-        if self.beta != 0.0:
-            with torch.inference_mode(), model.disable_adapter():
-                ref_per_token_logps = per_token_logps = get_logps_func(model, input_ids, attention_mask, logits_to_keep)
-        else:
-            ref_per_token_logps = None
+        # if self.beta != 0.0:
+        #     with torch.inference_mode(), model.disable_adapter():
+        #         ref_per_token_logps = per_token_logps = get_logps_func(model, input_ids, attention_mask, logits_to_keep)
+        # else:
+        #     ref_per_token_logps = None
+        ref_hidden_states = inputs.get("ref_per_token_logps", None)
         # per_token_kl = torch.exp(ref_per_token_logps - per_token_logps) - (ref_per_token_logps - per_token_logps) - 1
         # x - x.detach() allows for preserving gradients from x
         advantages = inputs["advantages"]
@@ -2469,6 +2589,7 @@ class _UnslothGRPOTrainer(Trainer):
         # per_token_loss = -(per_token_loss - self.beta * per_token_kl)
         # loss = ((per_token_loss * completion_mask).sum(dim=1) / completion_mask.sum(dim=1)).mean()
         old_hidden_states = inputs.get("old_per_token_logps", None)
+        
         input_ids = input_ids[:, -logits_to_keep:]
 
         # Get logit softcapping and logit scale
@@ -2478,21 +2599,27 @@ class _UnslothGRPOTrainer(Trainer):
         if logit_scale_multiply is None: logit_scale_multiply = 0
         logit_scale_divide = getattr(model.config, "logits_scaling", 0) # Granite
         if logit_scale_divide is None: logit_scale_divide = 0
+
         if per_token_logps is not None:
 
-            if ref_per_token_logps is not None:
-                ref_per_token_logps = ref_per_token_logps[:, :-1, :] # (B, L-1, V), exclude the last logit: it corresponds to the next token pred
+            if ref_hidden_states is not None:
+                ref_hidden_states = ref_hidden_states[:, :-1, :] # (B, L-1, V), exclude the last logit: it corresponds to the next token pred
+            if old_hidden_states is not None:
+                old_hidden_states = old_hidden_states[:, :-1, :] # (B, L-1, V), exclude the last logit: it corresponds to the next token pred
             per_token_logps = per_token_logps[:, :-1, :] # (B, L-1, V), exclude the last logit: it corresponds to the next token pred
 
             loss, completion_length, mean_kl = grpo_compute_loss_slow(
-                ref_per_token_logps,
+                ref_hidden_states,
                 per_token_logps,
                 old_hidden_states,
                 input_ids,
                 completion_mask,
                 self.beta,
                 advantages,
+                pixel_values = pixel_values,
+                image_grid_thw = image_grid_thw,
                 loss_type = self.args.loss_type,
+                importance_sampling_level = self.importance_sampling_level,
                 epsilon_low = self.epsilon_low,
                 epsilon_high = self.epsilon_high,
                 max_completion_length = self.args.max_completion_length,
@@ -2507,12 +2634,16 @@ class _UnslothGRPOTrainer(Trainer):
                 loss, completion_length, mean_kl = grpo_accumulated_loss(
                     trainer = self,
                     input_ids = _input_ids,
+                    pixel_values = pixel_values,
+                    image_grid_thw = image_grid_thw,
                     logits_to_keep = logits_to_keep,
                     completion_mask = completion_mask,
                     advantages = advantages,
                     old_hidden_states = old_hidden_states,
+                    ref_hidden_states = ref_hidden_states,
                     n_chunks = self.args.unsloth_num_chunks,
                     loss_type = self.args.loss_type,
+                    importance_sampling_level = self.importance_sampling_level,
                     epsilon_low = self.epsilon_low,
                     epsilon_high = self.epsilon_high,
                     max_completion_length = self.args.max_completion_length,
@@ -2532,6 +2663,7 @@ class _UnslothGRPOTrainer(Trainer):
                     completion_mask = completion_mask,
                     advantages = advantages,
                     old_hidden_states = old_hidden_states,
+                    ref_hidden_states = ref_hidden_states,
                     n_chunks = self.args.unsloth_num_chunks,
                     temperature = self.args.temperature,
                     logit_softcapping = logit_softcapping,
@@ -2589,11 +2721,9 @@ class _UnslothGRPOTrainer(Trainer):
 
         # Compute the loss
         advantages = inputs["advantages"]
-        # When num_iterations == 1 and steps_per_generation <= gradient_accumulation_steps,
-        # old_per_token_logps == per_token_logps. In this case we can skip its computation
-        # (see _generate_and_score_completions) and instead use per_token_logps.detach().
-        # The exception is when using vLLM, where we always compute old_per_token_logps
-        # for importance sampling
+        # When using num_iterations == 1 and steps_per_generation <= gradient_accumulation_steps
+        # old_per_token_logps == per_token_logps, so we can skip it's computation
+        # (see _generate_and_score_completions) and use per_token_logps.detach() instead.
         old_per_token_logps = inputs.get("old_per_token_logps")
         old_per_token_logps = per_token_logps.detach() if old_per_token_logps is None else old_per_token_logps
 
@@ -2623,10 +2753,6 @@ class _UnslothGRPOTrainer(Trainer):
         per_token_loss = -torch.min(per_token_loss1, per_token_loss2)
         if entropy_mask is not None:
             per_token_loss = per_token_loss * entropy_mask
-
-        if self.use_vllm and self.vllm_importance_sampling_correction:
-            per_token_loss = per_token_loss * inputs["importance_sampling_ratio"]
-
         if self.beta != 0.0:
             per_token_loss = per_token_loss + self.beta * per_token_kl
 
@@ -2885,7 +3011,8 @@ class UnslothGRPOTrainer(_UnslothGRPOTrainer):
             - [Standard](dataset_formats#standard): Each sample contains plain text.
             - [Conversational](dataset_formats#conversational): Each sample contains structured messages (e.g., role
               and content).
-        eval_dataset ([`~datasets.Dataset`], [`~datasets.IterableDataset`] or `dict[str, Union[Dataset, IterableDataset]]`):
+        eval_dataset ([`~datasets.Dataset`], [`~datasets.IterableDataset`] or `dict[str, Union[Dataset,
+        IterableDataset]]`):
             Dataset to use for evaluation. It must meet the same requirements as `train_dataset`.
         processing_class ([`~transformers.PreTrainedTokenizerBase`], [`~transformers.ProcessorMixin`] or `None`, *optional*, defaults to `None`):
             Processing class used to process the data. The padding side must be set to "left". If `None`, the
@@ -2908,7 +3035,8 @@ class UnslothGRPOTrainer(_UnslothGRPOTrainer):
 
             If you want to remove one of the default callbacks used, use the [`~transformers.Trainer.remove_callback`]
             method.
-        optimizers (`tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR]`, *optional*, defaults to `(None, None)`):
+        optimizers (`tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR]`, *optional*, defaults to `(None,
+        None)`):
             A tuple containing the optimizer and the scheduler to use. Will default to an instance of [`AdamW`] on your
             model and a scheduler given by [`get_linear_schedule_with_warmup`] controlled by `args`.
         peft_config ([`~peft.PeftConfig`], *optional*, defaults to `None`):
@@ -2934,7 +3062,8 @@ class UnslothGRPOTrainer(_UnslothGRPOTrainer):
         use_fp16 = getattr(args, 'fp16', False)
         if type(use_fp16) is not bool: use_fp16 = False
         force_float32 = False
-        if os.environ.get('UNSLOTH_FORCE_FLOAT32', '0') == '1':
+        full_finetuning = os.environ.get('UNSLOTH_ENABLE_FULL_FINETUNING', '0') == '1'
+        if not full_finetuning and (os.environ.get('UNSLOTH_FORCE_FLOAT32', '0') == '1'):
             print('Unsloth: Switching to float32 training since model cannot work with float16')
             force_float32 = True
         mixed_precision_dtype = os.environ.get('UNSLOTH_MIXED_PRECISION', 'float32')
@@ -2946,10 +3075,12 @@ class UnslothGRPOTrainer(_UnslothGRPOTrainer):
         if not force_float32 and (float16 and use_bf16): raise TypeError('Unsloth: Model is in float16 precision but you want to use bfloat16 precision. Set fp16 to `True` and bf16 to `False`')
         if not force_float32 and (not float16 and use_fp16): raise TypeError('Unsloth: Model is in bfloat16 precision but you want to use float16 precision. Set fp16 to `False` and bf16 to `True`')
         if force_float32:
+            # Forced float32 training
             args.fp16 = False
             args.bf16 = False
             os.environ['ACCELERATE_MIXED_PRECISION'] = 'no'
         elif (not use_bf16 and not use_fp16) and mixed_precision_dtype == 'float32':
+            # Mixed precision training
             args.fp16 = float16
             args.bf16 = not float16
             os.environ['ACCELERATE_MIXED_PRECISION'] = 'fp16' if float16 else 'bf16'
@@ -3017,6 +3148,13 @@ class UnslothGRPOTrainer(_UnslothGRPOTrainer):
         from unsloth_zoo.logging_utils import PatchRLStatistics
         PatchRLStatistics('grpo_trainer', other_metrics)
         
+        # [TODO] Fix up DataParallel multiplying batch sizes
+        # [TODO] DDP works, but DP seems to not work? [TODO]
+        if getattr(args, "parallel_mode", None) == ParallelMode.NOT_DISTRIBUTED and args.n_gpu > 1:
+            if getattr(args, "_n_gpu", 1) != 1:
+                args._n_gpu = 1
+        if "model" in locals() and hasattr(model, "for_training"):
+            model.for_training()
         super().__init__(
             model = model,
             reward_funcs = reward_funcs,
@@ -3027,6 +3165,8 @@ class UnslothGRPOTrainer(_UnslothGRPOTrainer):
             reward_processing_classes = reward_processing_classes,
             callbacks = callbacks,
             peft_config = peft_config,**kwargs)
+        if "model" in locals() and hasattr(model, "for_inference"):
+            model.for_inference()
         if hasattr(self, 'neftune_hook_handle'):
             self.neftune_hook_handle.remove()
             if hasattr(self, 'neftune_hook_handle'): del self.neftune_hook_handle
@@ -3040,6 +3180,9 @@ class UnslothGRPOTrainer(_UnslothGRPOTrainer):
                 current_model.accelerator_scaler = scaler
                 current_model = current_model.model
             current_model.accelerator_scaler = scaler
+        pass
+        if hasattr(self, 'train'):
+            self.train = MethodType(prepare_for_training_mode(self.__class__.train), self)
         pass
         
 pass

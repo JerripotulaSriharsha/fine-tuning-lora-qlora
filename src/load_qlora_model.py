@@ -35,13 +35,12 @@ Choose exactly one of: "Good", "Bad", or "Standard"
     full = ""
     for chunk in llm.create_completion(
         prompt,
-        max_tokens=256,
+        max_tokens=500,
         stream=True,
         temperature=0.3,
         top_p=0.9,
         repeat_penalty=1.2,
-        top_k=40,
-        stop=["</answer>", "</reasoning>", "<|end|>"]
+        top_k=40
     ):
         text = chunk["choices"][0]["text"]
         if streamlit_container:

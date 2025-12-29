@@ -1,10 +1,27 @@
 """
-2025.9.5
-2025.9.4
-4.56.1
-0.23.0
+2025.9.12
+2025.9.9
+4.56.2
+0.22.2
 __UNSLOTH_VERSIONING__
 """
+
+# Unsloth auto generated code
+# Copyright 2023-present Daniel Han-Chen, Michael Han-Chen & the Unsloth team. All rights reserved.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 from torch import Tensor
 import torch
 import torch.nn as nn
@@ -22,6 +39,24 @@ import numpy as np
 from contextlib import nullcontext
 from torch.nn import functional as F
 from transformers import DataCollatorForSeq2Seq, DataCollatorForLanguageModeling as TransformersDataCollatorForLanguageModeling
+from transformers.training_args import ParallelMode
+
+# Wrap trainer with padding to right and enable training mode
+import functools
+from types import MethodType
+def prepare_for_training_mode(f):
+    @functools.wraps(f)
+    def wrapper(self, *args, **kwargs):
+        # Enable training mode
+        if hasattr(self, 'model') and hasattr(self.model, "for_training"):
+            self.model.for_training()
+        output = f(self, *args, **kwargs)
+        # Return inference mode
+        if hasattr(self, 'model') and hasattr(self.model, "for_inference"):
+            self.model.for_inference()
+        return output
+    return wrapper
+pass
 
 torch_compile_options = {
     "epilogue_fusion"   : True,
@@ -48,6 +83,62 @@ def chunked_selective_log_softmax(logits, index):
     all_per_token_logps = torch.concat(all_per_token_logps)
     all_per_token_logps = all_per_token_logps.reshape((logits.shape[0], logits.shape[1]))
     return all_per_token_logps
+
+def calculate_pad_tokens_in_prompt(
+    input_ids: torch.Tensor,
+    logits_to_keep: int,
+    pad_token_id: int
+) -> torch.Tensor:
+    """
+    Given prompt tensor, it returns all the left padded tokens in that sequence. so [pad, pad, pad, cat] = 3 tokens 
+    """
+    if logits_to_keep >= input_ids.shape[1]:
+        raise ValueError("logits_to_keep must be smaller than the sequence length.")
+
+    prompt_section = input_ids[:, :-logits_to_keep]
+
+    padding_mask = (prompt_section == pad_token_id)
+
+    pad_token_counts = padding_mask.sum(dim=1)
+
+    return pad_token_counts
+
+def create_completion_attention_mask(
+    completion_input_ids: torch.Tensor,
+    left_pad_tokens_per_prompt: torch.Tensor,
+    max_left_pad: int,
+    pad_token_id: int
+) -> torch.Tensor:
+    """
+    Given that we have a sequence, [p,p,p,c,c,c,pad,pad,pad]
+
+    Where p are extra prompt tokens we got from slicing the torch tensor, c is completion tokens
+    and pad are pad tokens, this function would make a completion mask that would 0 out the pad
+    and p tokens. so in this example [0,0,0,1,1,1,0,0,0]
+    """
+    batch_size, completion_len = completion_input_ids.shape
+    device = completion_input_ids.device
+
+    num_tokens_to_mask = max_left_pad - left_pad_tokens_per_prompt
+
+    indices = torch.arange(completion_len, device=device).unsqueeze(0)
+    shift_mask = indices >= num_tokens_to_mask.unsqueeze(1)
+
+    non_padding_mask = (completion_input_ids != pad_token_id)
+
+    final_mask = shift_mask & non_padding_mask
+
+    return final_mask
+
+def left_pack_padding(tensor: torch.Tensor, pad_id: int) -> torch.Tensor:
+    """
+    Moves all padding tokens in each sequence of a batch to the right.
+    """
+    mask = (tensor != pad_id)
+    # Must do stable=True since binary mark is unordered
+    sorted_indices = torch.argsort(mask, dim=1, descending=True, stable=True)
+    packed_tensor = torch.gather(tensor, 1, sorted_indices)
+    return packed_tensor
 @dataclass
 class UnslothXPOConfig(XPOConfig):
     """
@@ -210,31 +301,15 @@ class UnslothXPOConfig(XPOConfig):
         max_new_tokens = 64,
         max_length = 512,
         temperature = 0.9,
-        top_p = 1.0,
-        top_k = None,
-        min_p = None,
-        repetition_penalty = 1.0,
-        generation_kwargs = {},
-        use_transformers_paged = False,
-        cache_implementation = None,
         missing_eos_penalty = None,
         loss_type = 'sigmoid',
+        dataset_num_proc = None,
         disable_dropout = True,
         use_vllm = False,
         vllm_model_impl = 'vllm',
-        vllm_guided_decoding_regex = None,
-        vllm_gpu_memory_utilization = 0.55,
-        vllm_mode = 'colocate',
-        vllm_server_base_url = None,
-        vllm_server_host = '0.0.0.0',
-        vllm_server_port = 8000,
-        vllm_server_timeout = 240.0,
-        vllm_tensor_parallel_size = 1,
+        gpu_memory_utilization = 0.55,
         ds3_gather_for_generation = True,
         model_init_kwargs = None,
-        reward_weights = None,
-        dataset_num_proc = None,
-        gpu_memory_utilization = None,
         vllm_sampling_params = None,
         unsloth_num_chunks = -1,
         max_seq_length = None,
@@ -389,31 +464,15 @@ class UnslothXPOConfig(XPOConfig):
             max_new_tokens = max_new_tokens,
             max_length = max_length,
             temperature = temperature,
-            top_p = top_p,
-            top_k = top_k,
-            min_p = min_p,
-            repetition_penalty = repetition_penalty,
-            generation_kwargs = generation_kwargs,
-            use_transformers_paged = use_transformers_paged,
-            cache_implementation = cache_implementation,
             missing_eos_penalty = missing_eos_penalty,
             loss_type = loss_type,
+            dataset_num_proc = dataset_num_proc,
             disable_dropout = disable_dropout,
             use_vllm = use_vllm,
             vllm_model_impl = vllm_model_impl,
-            vllm_guided_decoding_regex = vllm_guided_decoding_regex,
-            vllm_gpu_memory_utilization = vllm_gpu_memory_utilization,
-            vllm_mode = vllm_mode,
-            vllm_server_base_url = vllm_server_base_url,
-            vllm_server_host = vllm_server_host,
-            vllm_server_port = vllm_server_port,
-            vllm_server_timeout = vllm_server_timeout,
-            vllm_tensor_parallel_size = vllm_tensor_parallel_size,
+            gpu_memory_utilization = gpu_memory_utilization,
             ds3_gather_for_generation = ds3_gather_for_generation,
-            model_init_kwargs = model_init_kwargs,
-            reward_weights = reward_weights,
-            dataset_num_proc = dataset_num_proc,
-            gpu_memory_utilization = gpu_memory_utilization,**kwargs)
+            model_init_kwargs = model_init_kwargs,**kwargs)
         self.vllm_sampling_params = vllm_sampling_params
         self.unsloth_num_chunks = unsloth_num_chunks
         self.max_seq_length = max_seq_length
@@ -428,7 +487,7 @@ class _UnslothXPOTrainer(OnlineDPOTrainer):
         self,
         model: Union[PreTrainedModel, nn.Module] = None,
         ref_model: Union[PreTrainedModel, nn.Module] = None,
-        reward_funcs: Optional[nn.Module] = None,
+        reward_model: Optional[nn.Module] = None,
         judge: Optional[BasePairwiseJudge] = None,
         args: Optional[XPOConfig] = None,
         data_collator: Optional[Callable] = None,
@@ -437,27 +496,23 @@ class _UnslothXPOTrainer(OnlineDPOTrainer):
         processing_class: Optional[
             Union[PreTrainedTokenizerBase, BaseImageProcessor, FeatureExtractionMixin, ProcessorMixin]
         ] = None,
-        reward_processing_classes: Optional[Union[PreTrainedTokenizerBase, list[PreTrainedTokenizerBase]]] = None,
         peft_config: Optional[dict] = None,
         compute_metrics: Optional[Callable[[EvalPrediction], dict]] = None,
         callbacks: Optional[list[TrainerCallback]] = None,
         optimizers: tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
         preprocess_logits_for_metrics: Optional[Callable[[torch.Tensor, torch.Tensor], torch.Tensor]] = None,
-        # Deprecated parameters
-        reward_model: Optional[Union[PreTrainedModel, nn.Module]] = None,
     ) -> None:
         super().__init__(
             model=model,
             ref_model=ref_model,
             judge=judge,
-            reward_funcs=reward_funcs,
             reward_model=reward_model,
             args=args,
             data_collator=data_collator,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
             processing_class=processing_class,
-            reward_processing_classes=reward_processing_classes,
+            reward_processing_class=processing_class,  # for now, XPOTrainer can't use any reward model
             peft_config=peft_config,
             compute_metrics=compute_metrics,
             callbacks=callbacks,
@@ -487,10 +542,8 @@ class _UnslothXPOTrainer(OnlineDPOTrainer):
             "alpha": [],
             "beta": [],
         }
-        if self.reward_funcs is not None:
-            if len(self.reward_funcs) != 1:
-                raise ValueError("XPOTrainer only supports one reward function/model.")
-            self.reward_funcs = self.reward_funcs[0]
+        if self.reward_model is not None:
+            # Replace "scores" by "model_scores" and "ref_scores"
             self.stats["objective/model_scores"] = []
             self.stats["objective/ref_scores"] = []
             self.stats["objective/scores_margin"] = []
@@ -561,10 +614,10 @@ class _UnslothXPOTrainer(OnlineDPOTrainer):
     def _compute_rewards(self, model_data, ref_data, context_length):
         with torch.no_grad():
             _, model_scores, _ = get_reward(
-                self.reward_funcs, model_data["input_ids"], self.processing_class.pad_token_id, context_length
+                self.reward_model, model_data["input_ids"], self.processing_class.pad_token_id, context_length
             )
             _, ref_scores, _ = get_reward(
-                self.reward_funcs, ref_data["input_ids"], self.processing_class.pad_token_id, context_length
+                self.reward_model, ref_data["input_ids"], self.processing_class.pad_token_id, context_length
             )
 
         # Apply EOS penalty if needed
@@ -707,7 +760,7 @@ class _UnslothXPOTrainer(OnlineDPOTrainer):
         self.stats["loss/xpo"].append(gather_mean(xpo_losses))
 
         # Log scores
-        if self.reward_funcs is not None:
+        if self.reward_model is not None:
             self.stats["objective/model_scores"].append(gather_mean(model_scores))
             self.stats["objective/ref_scores"].append(gather_mean(ref_scores))
             self.stats["objective/scores_margin"].append(gather_mean(model_scores - ref_scores))
@@ -796,7 +849,7 @@ class _UnslothXPOTrainer(OnlineDPOTrainer):
         model_data, ref_data = self._process_completions(model_output, ref_output, prompts)
 
         # Compute rewards
-        if self.reward_funcs is not None:
+        if self.reward_model is not None:
             model_scores, ref_scores = self._compute_rewards(model_data, ref_data, context_length)
             chosen_mask = model_scores >= ref_scores
         else:
@@ -932,7 +985,7 @@ class UnslothXPOTrainer(_UnslothXPOTrainer):
             Hugging Face transformer model with a casual language modelling head. Used for implicit reward computation
             and loss. If no reference model is provided, the trainer will create a reference model with the same
             architecture as the model to be optimized.
-        reward_funcs (`transformers.PreTrainedModel`):
+        reward_model (`transformers.PreTrainedModel`):
             The reward model to score completions with, preferably an `AutoModelForSequenceClassification`.
         judge (`BasePairwiseJudge`):
             The judge to use for pairwise comparison of model completions.
@@ -961,32 +1014,23 @@ class UnslothXPOTrainer(_UnslothXPOTrainer):
             The optimizer and scheduler to use for training.
         preprocess_logits_for_metrics (`Callable[[torch.Tensor, torch.Tensor], torch.Tensor]`):
             The function to use to preprocess the logits before computing the metrics.
-
-    .. deprecated:: 0.22.0
-        The following parameters are deprecated and will be removed in a future version:
-
-        * `reward_model`: Use `reward_funcs` instead. For example, change `reward_model=model` to `reward_funcs=model`.
-        * `reward_processing_class`: Use `reward_processing_classes` instead. For example, change
-          `reward_processing_class=tokenizer` to `reward_processing_classes=tokenizer`.
     
     """
     def __init__(
         self,
         model = None,
         ref_model = None,
-        reward_funcs = None,
+        reward_model = None,
         judge = None,
         args = None,
         data_collator = None,
         train_dataset = None,
         eval_dataset = None,
         processing_class = None,
-        reward_processing_classes = None,
         peft_config = None,
         compute_metrics = None,
         callbacks = None,
         preprocess_logits_for_metrics = None,
-        reward_model = None,
         **kwargs
     ):
         if args is None: args = UnslothXPOConfig()
@@ -995,7 +1039,8 @@ class UnslothXPOTrainer(_UnslothXPOTrainer):
         use_fp16 = getattr(args, 'fp16', False)
         if type(use_fp16) is not bool: use_fp16 = False
         force_float32 = False
-        if os.environ.get('UNSLOTH_FORCE_FLOAT32', '0') == '1':
+        full_finetuning = os.environ.get('UNSLOTH_ENABLE_FULL_FINETUNING', '0') == '1'
+        if not full_finetuning and (os.environ.get('UNSLOTH_FORCE_FLOAT32', '0') == '1'):
             print('Unsloth: Switching to float32 training since model cannot work with float16')
             force_float32 = True
         mixed_precision_dtype = os.environ.get('UNSLOTH_MIXED_PRECISION', 'float32')
@@ -1007,10 +1052,12 @@ class UnslothXPOTrainer(_UnslothXPOTrainer):
         if not force_float32 and (float16 and use_bf16): raise TypeError('Unsloth: Model is in float16 precision but you want to use bfloat16 precision. Set fp16 to `True` and bf16 to `False`')
         if not force_float32 and (not float16 and use_fp16): raise TypeError('Unsloth: Model is in bfloat16 precision but you want to use float16 precision. Set fp16 to `False` and bf16 to `True`')
         if force_float32:
+            # Forced float32 training
             args.fp16 = False
             args.bf16 = False
             os.environ['ACCELERATE_MIXED_PRECISION'] = 'no'
         elif (not use_bf16 and not use_fp16) and mixed_precision_dtype == 'float32':
+            # Mixed precision training
             args.fp16 = float16
             args.bf16 = not float16
             os.environ['ACCELERATE_MIXED_PRECISION'] = 'fp16' if float16 else 'bf16'
@@ -1099,22 +1146,29 @@ class UnslothXPOTrainer(_UnslothXPOTrainer):
         from unsloth_zoo.logging_utils import PatchRLStatistics
         PatchRLStatistics('xpo_trainer', other_metrics)
         
+        # [TODO] Fix up DataParallel multiplying batch sizes
+        # [TODO] DDP works, but DP seems to not work? [TODO]
+        if getattr(args, "parallel_mode", None) == ParallelMode.NOT_DISTRIBUTED and args.n_gpu > 1:
+            if getattr(args, "_n_gpu", 1) != 1:
+                args._n_gpu = 1
+        if "model" in locals() and hasattr(model, "for_training"):
+            model.for_training()
         super().__init__(
             model = model,
             ref_model = ref_model,
-            reward_funcs = reward_funcs,
+            reward_model = reward_model,
             judge = judge,
             args = args,
             data_collator = data_collator,
             train_dataset = train_dataset,
             eval_dataset = eval_dataset,
             processing_class = processing_class,
-            reward_processing_classes = reward_processing_classes,
             peft_config = peft_config,
             compute_metrics = compute_metrics,
             callbacks = callbacks,
-            preprocess_logits_for_metrics = preprocess_logits_for_metrics,
-            reward_model = reward_model,**kwargs)
+            preprocess_logits_for_metrics = preprocess_logits_for_metrics,**kwargs)
+        if "model" in locals() and hasattr(model, "for_inference"):
+            model.for_inference()
         if hasattr(self, 'neftune_hook_handle'):
             self.neftune_hook_handle.remove()
             if hasattr(self, 'neftune_hook_handle'): del self.neftune_hook_handle
@@ -1128,6 +1182,9 @@ class UnslothXPOTrainer(_UnslothXPOTrainer):
                 current_model.accelerator_scaler = scaler
                 current_model = current_model.model
             current_model.accelerator_scaler = scaler
+        pass
+        if hasattr(self, 'train'):
+            self.train = MethodType(prepare_for_training_mode(self.__class__.train), self)
         pass
         
 pass

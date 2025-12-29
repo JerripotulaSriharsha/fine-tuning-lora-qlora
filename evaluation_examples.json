@@ -1,0 +1,42 @@
+[
+  {
+    "question":"Age: 19.0, Occupation: Musician, Annual Income: 18246.25_, Outstanding Debt: 845.61, Credit Utilization Ratio: 40.44063497957373, Payment Behaviour: Low_spent_Small_value_payments",
+    "answer":"Good"
+  },
+  {
+    "question":"Age: 20.0, Occupation: Doctor, Annual Income: 38197.25, Outstanding Debt: 898.75, Credit Utilization Ratio: 30.700684566089016, Payment Behaviour: High_spent_Medium_value_payments",
+    "answer":"Good"
+  },
+  {
+    "question":"Age: 37.0, Occupation: Doctor, Annual Income: 14619.875_, Outstanding Debt: 107.8, Credit Utilization Ratio: 33.09344778317082, Payment Behaviour: Low_spent_Small_value_payments",
+    "answer":"Good"
+  },
+  {
+    "question":"Age: 23.0, Occupation: Musician, Annual Income: 19028.33, Outstanding Debt: 457.92, Credit Utilization Ratio: 36.66173025979048, Payment Behaviour: Low_spent_Small_value_payments",
+    "answer":"Good"
+  },
+  {
+    "question":"Age: 17.0, Occupation: Manager, Annual Income: 44286.36, Outstanding Debt: 2069.01, Credit Utilization Ratio: 37.48510261728924, Payment Behaviour: High_spent_Large_value_payments",
+    "answer":"Standard"
+  },
+  {
+    "question":"Age: 31.0, Occupation: Teacher, Annual Income: 7889.11, Outstanding Debt: 973.01, Credit Utilization Ratio: 32.55273639375636, Payment Behaviour: Low_spent_Small_value_payments",
+    "answer":"Standard"
+  },
+  {
+    "question":"Age: 39.0, Occupation: Scientist, Annual Income: 30450.84, Outstanding Debt: 203.69, Credit Utilization Ratio: 36.74535808122435, Payment Behaviour: Low_spent_Large_value_payments",
+    "answer":"Standard"
+  },
+  {
+    "question":"Age: 22.0, Occupation: Media_Manager, Annual Income: 59102.91, Outstanding Debt: 3847.48, Credit Utilization Ratio: 27.347995916297727, Payment Behaviour: High_spent_Small_value_payments",
+    "answer":"Bad"
+  },
+  {
+    "question":"Age: 38.0, Occupation: Mechanic, Annual Income: 44983.95, Outstanding Debt: 2998.57, Credit Utilization Ratio: 24.75993117068417, Payment Behaviour: High_spent_Medium_value_payments",
+    "answer":"Bad"
+  },
+  {
+    "question":"Age: 37.0, Occupation: Mechanic, Annual Income: 18666.83, Outstanding Debt: 4072.19, Credit Utilization Ratio: 26.692371876812206, Payment Behaviour: Low_spent_Medium_value_payments",
+    "answer":"Bad"
+  }
+]
